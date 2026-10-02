@@ -1,0 +1,2 @@
+# Python 3.12 environment
+# No runtime dependencies required for Chapter 1 scaffolding
