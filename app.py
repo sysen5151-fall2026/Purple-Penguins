@@ -1,9 +1,8 @@
-"""App orchestrator for Chapter 2 walking skeleton.
+"""Recipe Roulette Flask foundation and Chapter 2 console walking skeleton."""
 
-Implements UC.1 baseline scenario per docs/walking-skeleton.md.
-Sequence: User → App → LLM API → Grocery Store → LLM API → App → User.
-"""
+import argparse
 
+from flask import Flask
 from user_interface import (
     request_login_info,
     request_ingredients,
@@ -12,6 +11,22 @@ from user_interface import (
     display_recipe_and_pricing,
 )
 from llm_api_interface import send_recipe_requirements, request_pricing
+
+
+def create_app(test_config=None):
+    """Create the Flask application without starting the console workflow."""
+    app = Flask(
+        __name__,
+        template_folder="user_interface/templates",
+        static_folder="user_interface/static",
+    )
+    if test_config is not None:
+        app.config.update(test_config)
+
+    from user_interface.routes import web
+
+    app.register_blueprint(web)
+    return app
 
 
 def run_baseline_scenario():
@@ -48,5 +63,22 @@ def run_baseline_scenario():
     display_recipe_and_pricing(recipes_with_pricing)
 
 
+def main(argv=None):
+    """Start the web application, or run the console scenario with --cli."""
+    parser = argparse.ArgumentParser(description="Run Recipe Roulette.")
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="run the original console walking skeleton",
+    )
+    args = parser.parse_args(argv)
+
+    if args.cli:
+        run_baseline_scenario()
+        return
+
+    create_app().run(host="127.0.0.1", port=5000)
+
+
 if __name__ == "__main__":
-    run_baseline_scenario()
+    main()
