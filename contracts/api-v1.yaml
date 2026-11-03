@@ -1,0 +1,164 @@
+openapi: 3.1.0
+info:
+  title: Recipe Roulette API
+  version: 1.0.0
+  description: >-
+    Planned contract for the Recipe Roulette recipe-generation workflow.
+    This API is not implemented yet. The initial backend uses deterministic
+    local recipe and pricing stubs, not production recommendation or live
+    grocery services.
+paths:
+  /api/v1/recipes:
+    post:
+      operationId: generateRecipes
+      summary: Generate recipe recommendations and estimated pricing
+      description: >-
+        Planned endpoint. Accepts ingredients, budget, and dietary restrictions,
+        then calls the existing recipe-generation and pricing stubs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipeGenerationRequest"
+      responses:
+        "200":
+          description: Recipe recommendations with estimated ingredient prices and totals.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeGenerationResponse"
+        "400":
+          description: The request body is malformed or contains invalid fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "500":
+          description: Recipe generation or pricing failed unexpectedly.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackendFailure"
+
+components:
+  schemas:
+    RecipeGenerationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - ingredients
+        - budget
+        - dietary_restrictions
+      properties:
+        ingredients:
+          type: array
+          description: User-provided ingredients corresponding to User Preferences / Ingredients.
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        budget:
+          type: number
+          exclusiveMinimum: 0
+          description: User's monetary budget in USD.
+        dietary_restrictions:
+          type: array
+          description: Dietary restrictions supplied for this recipe request; an empty list means none.
+          items:
+            type: string
+            minLength: 1
+      description: >-
+        Servings are omitted because they are not currently supported by the
+        backend and are not confirmed as an Innoslate requirement.
+
+    RecipeGenerationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - recipes
+      properties:
+        recipes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecipeResult"
+
+    RecipeResult:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - ingredients
+        - estimated_total_cost
+      properties:
+        name:
+          type: string
+          minLength: 1
+        ingredients:
+          type: array
+          description: Ingredient names and their estimated prices from the local pricing stub.
+          items:
+            $ref: "#/components/schemas/PricedIngredient"
+        estimated_total_cost:
+          type: number
+          minimum: 0
+          description: Sum of the estimated prices returned for this recipe's ingredients, in USD.
+
+    PricedIngredient:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - estimated_price
+      properties:
+        name:
+          type: string
+          minLength: 1
+        estimated_price:
+          type: number
+          minimum: 0
+          description: Estimated price in USD from the deterministic grocery-store stub.
+
+    ValidationError:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              const: invalid_request
+            message:
+              type: string
+            field_errors:
+              type: object
+              description: Optional mapping from request field names to validation messages.
+              additionalProperties:
+                type: string
+
+    BackendFailure:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              const: backend_failure
+            message:
+              type: string
+              description: Safe user-facing message; internal exception details must not be returned.
