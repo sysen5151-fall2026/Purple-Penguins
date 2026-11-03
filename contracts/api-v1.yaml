@@ -3,18 +3,19 @@ info:
   title: Recipe Roulette API
   version: 1.0.0
   description: >-
-    Planned contract for the Recipe Roulette recipe-generation workflow.
-    This API is not implemented yet. The initial backend uses deterministic
-    local recipe and pricing stubs, not production recommendation or live
-    grocery services.
+    Implemented recipe-generation workflow using deterministic local recipe
+    and pricing stubs. Ingredient ownership affects estimated additional
+    purchase cost; this is not a production recommendation or live grocery
+    pricing service.
 paths:
   /api/v1/recipes:
     post:
       operationId: generateRecipes
       summary: Generate recipe recommendations and estimated pricing
       description: >-
-        Planned endpoint. Accepts ingredients, budget, and dietary restrictions,
-        then calls the existing recipe-generation and pricing stubs.
+        Accepts ingredients the user already owns, a budget, and dietary
+        restrictions; returns deterministic recipe and pricing data with
+        ownership-aware additional purchase costs.
       requestBody:
         required: true
         content:
@@ -53,7 +54,10 @@ components:
       properties:
         ingredients:
           type: array
-          description: User-provided ingredients corresponding to User Preferences / Ingredients.
+          description: >-
+            Ingredients the user already owns. The backend uses case-insensitive
+            exact-name matching after trimming surrounding whitespace and assumes
+            the user has enough of each listed ingredient.
           minItems: 1
           items:
             type: string
@@ -90,6 +94,8 @@ components:
         - name
         - ingredients
         - estimated_total_cost
+        - additional_purchase_cost
+        - within_budget
       properties:
         name:
           type: string
@@ -102,7 +108,18 @@ components:
         estimated_total_cost:
           type: number
           minimum: 0
-          description: Sum of the estimated prices returned for this recipe's ingredients, in USD.
+          description: >-
+            Full recipe cost: sum of all estimated ingredient prices, whether
+            or not the user already owns those ingredients, in USD.
+        additional_purchase_cost:
+          type: number
+          minimum: 0
+          description: >-
+            Sum of estimated prices for ingredients the user does not already
+            own, in USD.
+        within_budget:
+          type: boolean
+          description: Whether additional_purchase_cost is less than or equal to the submitted budget.
 
     PricedIngredient:
       type: object
@@ -110,6 +127,7 @@ components:
       required:
         - name
         - estimated_price
+        - owned
       properties:
         name:
           type: string
@@ -118,6 +136,9 @@ components:
           type: number
           minimum: 0
           description: Estimated price in USD from the deterministic grocery-store stub.
+        owned:
+          type: boolean
+          description: Whether the ingredient exactly matches a user-owned ingredient after case and whitespace normalization.
 
     ValidationError:
       type: object

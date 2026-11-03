@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, render_template, request
 from recipe_service import (
     RecipeRequestValidationError,
     format_and_validate_api_request,
+    specify_already_owned_recipe_ingredients,
     submit_recipe_and_pricing_requests,
 )
 
@@ -40,7 +41,10 @@ def generate_recipes():
             400,
         )
 
-    response = submit_recipe_and_pricing_requests(recipe_request)
+    request_with_ownership = specify_already_owned_recipe_ingredients(
+        recipe_request
+    )
+    response = submit_recipe_and_pricing_requests(request_with_ownership)
     return jsonify(response)
 
 

@@ -25,10 +25,11 @@
           you are not authenticated.
         </p>
         <p class="demo-notice data-notice">
-          <strong>Demonstration data:</strong> The API returns fixed recipes
-          and estimated stub prices. Your ingredients, budget, and dietary
-          restrictions do not filter the results. Recipes may not fit your
-          budget or dietary needs; verify ingredients and allergens yourself.
+          <strong>Demonstration data:</strong> Recipe suggestions and prices
+          are fixed. Owned ingredients adjust the additional-purchase estimate;
+          they do not change which recipes are returned. The budget does not
+          filter recipes, and dietary restrictions are not necessarily enforced.
+          Verify ingredients and allergens yourself.
         </p>
       </section>
 
@@ -55,7 +56,7 @@
 
           <form id="recipe-form" novalidate>
             <div class="field">
-              <label for="ingredients">Ingredients you have</label>
+              <label for="ingredients">Ingredients you already own</label>
               <textarea
                 id="ingredients"
                 name="ingredients"
@@ -66,7 +67,8 @@
                 required
               ></textarea>
               <p class="field-hint" id="ingredients-help">
-                Separate ingredients with commas or new lines.
+                Separate ingredients with commas or new lines. We assume you
+                have enough of each listed ingredient; quantities are not tracked.
               </p>
               <p class="field-error" id="ingredients-error"></p>
             </div>
