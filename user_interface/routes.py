@@ -16,7 +16,7 @@ web = Blueprint("web", __name__, template_folder="templates")
 
 @web.get("/")
 def home():
-    """Render the F.2 homepage foundation without running console prompts."""
+    """Render the interactive Recipe Roulette demonstration dashboard."""
     return render_template("index.html")
 
 

@@ -3,9 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Recipe Roulette web interface foundation">
+    <meta name="description" content="Explore Recipe Roulette demonstration recipes">
     <title>Recipe Roulette</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/recipe-roulette.js') }}" defer></script>
   </head>
   <body>
     <main class="page">
@@ -17,14 +18,123 @@
         </div>
       </header>
 
-      <section class="notice" aria-labelledby="status-heading">
-        <p class="eyebrow">A new way to plan meals</p>
-        <h1 id="status-heading">The web interface is under development</h1>
-        <p>
-          Recipe Roulette is getting ready. The browser-based recipe workflow
-          is not available yet.
+      <section class="demo-notices" aria-label="Demonstration limitations">
+        <p class="demo-notice login-notice">
+          <strong>Demo mode:</strong> The F.2.1 login approval prerequisite is
+          simulated so you can try this workflow. No login is collected and
+          you are not authenticated.
+        </p>
+        <p class="demo-notice data-notice">
+          <strong>Demonstration data:</strong> The API returns fixed recipes
+          and estimated stub prices. Your ingredients, budget, and dietary
+          restrictions do not filter the results. Recipes may not fit your
+          budget or dietary needs; verify ingredients and allergens yourself.
         </p>
       </section>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">A little inspiration for dinner</p>
+          <h1 id="page-title">What should we make today?</h1>
+          <p>Share what you have and spin up a few ideas.</p>
+        </div>
+        <div class="roulette-wheel" aria-hidden="true">
+          <span>RR</span>
+        </div>
+      </section>
+
+      <div class="dashboard">
+        <section class="preferences panel" aria-labelledby="preferences-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Your preferences</p>
+              <h2 id="preferences-title">Set your ingredients</h2>
+            </div>
+            <span class="step-badge" aria-hidden="true">01</span>
+          </div>
+
+          <form id="recipe-form" novalidate>
+            <div class="field">
+              <label for="ingredients">Ingredients you have</label>
+              <textarea
+                id="ingredients"
+                name="ingredients"
+                rows="4"
+                placeholder="For example: pasta, tomatoes, spinach"
+                aria-describedby="ingredients-help ingredients-error"
+                aria-invalid="false"
+                required
+              ></textarea>
+              <p class="field-hint" id="ingredients-help">
+                Separate ingredients with commas or new lines.
+              </p>
+              <p class="field-error" id="ingredients-error"></p>
+            </div>
+
+            <div class="field">
+              <label for="budget">Budget <span class="label-detail">(USD)</span></label>
+              <div class="currency-input">
+                <span aria-hidden="true">$</span>
+                <input
+                  id="budget"
+                  name="budget"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputmode="decimal"
+                  placeholder="50.00"
+                  aria-describedby="budget-help budget-error"
+                  aria-invalid="false"
+                  required
+                >
+              </div>
+              <p class="field-hint" id="budget-help">Enter a positive amount in US dollars.</p>
+              <p class="field-error" id="budget-error"></p>
+            </div>
+
+            <div class="field">
+              <label for="dietary-restrictions">
+                Dietary restrictions <span class="label-detail">(optional)</span>
+              </label>
+              <input
+                id="dietary-restrictions"
+                name="dietary_restrictions"
+                type="text"
+                placeholder="For example: vegetarian, gluten-free"
+                aria-describedby="dietary-help dietary-error"
+                aria-invalid="false"
+              >
+              <p class="field-hint" id="dietary-help">
+                Separate multiple restrictions with commas. Leave blank for none.
+              </p>
+              <p class="field-error" id="dietary-error"></p>
+            </div>
+
+            <button class="primary-button" id="generate-button" type="submit">
+              <span class="button-label">Spin for Recipes</span>
+              <span class="button-arrow" aria-hidden="true">→</span>
+            </button>
+            <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="results" aria-labelledby="results-title" aria-busy="false">
+          <div class="section-heading results-heading">
+            <div>
+              <p class="eyebrow">Fresh from the roulette</p>
+              <h2 id="results-title">Your recipe results</h2>
+            </div>
+            <span class="results-note">Demo recipes</span>
+          </div>
+          <div class="results-list" id="results-list" aria-live="polite">
+            <div class="empty-state" id="empty-state">
+              <span class="empty-icon" aria-hidden="true">✦</span>
+              <h3>Ready when you are</h3>
+              <p>Add your preferences and spin to see the available demonstration recipes.</p>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   </body>
 </html>

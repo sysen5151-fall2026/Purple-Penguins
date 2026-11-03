@@ -30,6 +30,31 @@ def test_homepage_contains_recipe_roulette_branding(client):
     assert b"Recipe Roulette" in response.data
 
 
+def test_homepage_contains_recipe_preference_controls_and_demo_notices(client):
+    response = client.get("/")
+    page = response.data
+
+    assert response.status_code == 200
+    assert b'id="recipe-form"' in page
+    assert b'id="ingredients"' in page
+    assert b'id="budget"' in page
+    assert b'id="dietary-restrictions"' in page
+    assert b"login approval prerequisite is" in page
+    assert b"you are not authenticated" in page
+    assert b"do not filter the results" in page
+    assert b"verify ingredients and allergens yourself" in page
+
+
+def test_homepage_loads_recipe_interface_assets(client):
+    css_response = client.get("/static/css/style.css")
+    js_response = client.get("/static/js/recipe-roulette.js")
+
+    assert css_response.status_code == 200
+    assert b"@media" in css_response.data
+    assert js_response.status_code == 200
+    assert b'fetch("/api/v1/recipes"' in js_response.data
+
+
 def test_homepage_startup_does_not_run_console_workflow(monkeypatch):
     def fail_if_console_runs():
         pytest.fail("The web application must not invoke console prompts.")
