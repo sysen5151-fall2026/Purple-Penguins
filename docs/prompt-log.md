@@ -112,7 +112,7 @@ Notes / follow-ups:
   - docs/environment.md
   - docs/walking-skeleton.md
   - contracts/api-v1.yaml
-  - Recipe Roulette (8).xml — latest Innoslate export, supplied as context and checked during this documentation cleanup
+  - `Recipe Roulette (8).xml` — export available during the Phase 3 documentation cleanup; its F.2.4 hierarchy was later superseded by XML10
   - Phase 3 implementation prompt — supplied the F.2.4.1–F.2.4.3 and C.2.4.1–C.2.4.3 labels used during implementation
   - Existing Chapter 2 walking skeleton implementation
   - Existing Flask application foundation
@@ -139,8 +139,8 @@ Notes / follow-ups:
 ### Rejected / corrected decisions
 
 - No implementation proposals were rejected.
-- During implementation, the newer function/component labels were taken from the Phase 3 prompt. The latest Innoslate export was provided afterward and checked during this cleanup, distinguishing the prompt source used during implementation from the export verification recorded here.
-- The latest export verifies these function/component IDs:
+- During implementation, the newer function/component labels were taken from the Phase 3 prompt. The export available during the subsequent cleanup was XML8; XML10 was supplied later and is the current source for the revised F.2.4 mapping.
+- XML8 verified these function/component IDs at that time; XML10 later superseded the F.2.4.3 label and added F.2.4.4:
   - F.2.4.1 — Prepare Recipe Request: `I_4FQB4AXSNMJTB_BP518PV5V30BN`
   - F.2.4.2 — Format and Validate API Request: `I_C5HVGPQMDEKPB_822HFWSBZWGEH`
   - F.2.4.3 — Submit Recipe and Pricing Requests: `I_C3XRN0P8R0JED_AS6RHTHBNZ0C6`
@@ -159,13 +159,13 @@ Notes / follow-ups:
 - Assumption: live external integrations are unnecessary for this milestone.
   - Disposition: accepted; deterministic stubs will be retained.
 - Assumption: the F.2.4.1–F.2.4.3 and C.2.4.1–C.2.4.3 labels in the Phase 3 prompt reflect the current intended decomposition.
-  - Disposition: the labels and names were used as supplied during implementation and were subsequently verified against `Recipe Roulette (8).xml`; the corresponding global IDs are recorded above.
+  - Disposition: the labels and names were used as supplied during implementation and verified against XML8 at that time. The later XML10 export revises this hierarchy; see the Phase 5 model reconciliation for the current mapping.
 
 ### Verification
 
 - Read-only inspection confirmed that the Flask application factory and `GET /` existed, while `POST /api/v1/recipes` did not.
 - The existing OpenAPI contract was preserved. The endpoint follows its request, priced-recipe response, validation error, and backend failure schemas.
-- Implemented F.2.4.1–F.2.4.3 using the function and component labels provided in the Phase 3 prompt. During this cleanup, their names and global IDs were verified against the latest export, `Recipe Roulette (8).xml`.
+- Implemented F.2.4.1–F.2.4.3 using the function and component labels provided in the Phase 3 prompt. During the Phase 3 cleanup, their names and global IDs were verified against XML8; XML10 later changed the current F.2.4.3/.4 mapping.
 - The endpoint reuses `send_recipe_requirements(...)` and `request_pricing(...)`. No live LLM integration or external grocery service was added.
 - Request preparation trims surrounding whitespace and rejects values that become empty; the budget is normalized to a finite positive float.
 - The Chapter 2 console walking skeleton remains callable with `python -m app --cli`.
@@ -173,6 +173,7 @@ Notes / follow-ups:
 - The test suite includes an end-to-end console walking-skeleton compatibility check using the existing recipe and pricing stubs.
 - After reporting the read-only inspection findings, implementation proceeded without a separate approval because no blocking conflict requiring clarification was found, as directed in the Phase 3 request.
 - No commit or push was performed.
+- Historical source note: XML8 was the export used for this phase's verification. XML10 is the current export and its updated mapping is recorded under Phase 5.
 
 ## 2026-11-02 — Phase 4 browser interface integration
 
@@ -184,7 +185,7 @@ Notes / follow-ups:
   - `user_interface/`, `recipe_service.py`, `llm_api_interface/`, and `grocery_store_interface/`
   - `contracts/api-v1.yaml`
   - `docs/context.md`, `docs/environment.md`, `docs/route-table.md`, and `docs/traceability.md`
-  - `Recipe Roulette (8).xml` — latest Innoslate export
+  - `Recipe Roulette (8).xml` — export used during Phase 4; subsequently superseded by XML10 for the current F.2.4 mapping
   - Existing automated tests and Phase 4 implementation approval
 - Prompt reference:
   - Saved prompt summary: `docs/prompts/2026-11-02-phase4-browser-interface.md`
@@ -205,7 +206,7 @@ Notes / follow-ups:
 - Do not change the OpenAPI contract or backend recipe/pricing implementation.
 - Do not add authentication, external LLM or grocery integrations, databases, frontend frameworks, or unrelated features.
 - Do not claim that stub results are personalized, budget-compliant, or dietary-safe.
-- Correct the outdated Phase 3 source note in `docs/traceability.md`; use `Recipe Roulette (8).xml` as the authoritative export, not an earlier version.
+- Correct the outdated Phase 3 source note in `docs/traceability.md`; use `Recipe Roulette (8).xml` as the Phase 4 source available at that time, not an earlier version.
 
 ### Assistant assumptions and disposition
 
@@ -223,4 +224,123 @@ Notes / follow-ups:
 - Flask startup: `python -m app` started successfully; `GET /` rendered the Recipe Roulette page.
 - Manual browser verification: a valid form submission returned and rendered both deterministic recipes with ingredient prices and totals; an empty-ingredient submission displayed the expected inline validation message.
 - JavaScript syntax-check command `node --check user_interface\static\js\recipe-roulette.js` could not run because Node.js is not installed in the environment. The browser successfully loaded and executed the script during the manual workflow check.
+- No commit or push was performed.
+
+## 2026-11-02 — Phase 5 ingredient-aware pricing
+
+- Date: 2026-11-02
+- Team member(s): [Manual confirmation required]
+- Assistant / model: [Manual confirmation required]
+- Built from:
+  - `app.py`, `recipe_service.py`, and existing recipe/pricing stubs
+  - `user_interface/`, existing tests, and `contracts/api-v1.yaml`
+  - `docs/traceability.md`, `docs/route-table.md`, and prior saved prompts
+  - `Recipe Roulette (8).xml` — export available during the initial Phase 5 implementation
+  - `Recipe Roulette (10).xml` — subsequently identified by the user as the latest export and used for this model reconciliation
+  - Follow-up user approval to align the existing Phase 5 changes to XML10 and document additional-cost calculation as an unallocated service-level helper
+- Prompt reference:
+  - Saved prompt summary: `docs/prompts/2026-11-02-phase5-ingredient-aware-pricing.md`
+- Reviewed by: [Manual confirmation required]
+
+### Accepted decisions
+
+- Treat the existing request `ingredients` array as ingredients the user already owns; do not change the request schema.
+- Match ingredient names after trimming whitespace and applying case-insensitive exact matching; do not use fuzzy equivalence or substitutions.
+- Preserve full estimated ingredient prices and the legacy `estimated_total_cost` field; add `owned`, `additional_purchase_cost`, and `within_budget` response fields.
+- Compare additional purchase cost, not full recipe cost, with the submitted budget. Assume sufficient quantities for each owned ingredient.
+- Keep ingredient matching in the Python backend; prepare a normalized, deduplicated internal ownership list before request submission, then preserve the separate recipe-generation and pricing calls and Chapter 2 console workflow.
+- Do not filter over-budget recipes; compare the additional purchase cost with the submitted budget.
+- Add the response fields to API v1 as an additive extension.
+- Align F.2.4.3 — Specify Already-Owned Recipe Ingredients (`I_C3XRN0P8R0JED_AS6RHTHBNZ0C6`) with C.2.4.3 — Ingredients List Redundancy Removal Device (`I_35QN82Z6Q6JT8_9S98VJAVR325X`).
+- Align F.2.4.4 — Submit Recipe and Pricing Requests (`I_CZFVR1YCP8J7C_87K5PYQC4ZNN0`) with C.2.4.4 — Request Submission Component (`I_6FJAPA7HG2GJC_9B0D0PAPPRQJS`).
+- Treat `calculate_recipe_costs` as an unallocated service-level helper. XML10 contains no separate F.2.4.5 or cost-calculation flow; do not assign an invented function ID.
+
+### Rejected / corrected decisions
+
+- Do not invent function IDs, component allocations, ICOM flows, or requirement IDs.
+- Do not modify the OpenAPI request shape, recipe-generation/pricing stubs, or Chapter 2 console sequence.
+- Do not add quantities, partial ownership, substitutions, fuzzy matching, live integrations, authentication, or persistence.
+- Do not calculate ownership deductions in browser JavaScript.
+
+### Assistant assumptions and disposition
+
+- Assumption: the existing `ingredients` request values can represent owned items.
+  - Disposition: approved by the user; the contract request shape remains unchanged.
+- Assumption: `estimated_total_cost` can remain the full recipe cost while the API adds purchase-cost and budget fields.
+  - Disposition: approved as the additive-v1 response approach.
+- Assumption: `Recipe Roulette (8).xml` remained the latest export.
+  - Disposition: superseded by the user's follow-up identifying XML10 as the latest export. XML10 verifies F.2.4.1–F.2.4.4 and C.2.4.1–C.2.4.4; no F.2.4.5 or separate cost-calculation flow is present.
+
+### Verification
+
+- Baseline before implementation: `python -m pytest -q` completed with 28 passed.
+- Final `python -m pytest -q`: 37 passed.
+- `git diff --check`: passed.
+- Browser smoke test using `python -m app`: submitting `PASTA, eggs` with a `$5.99` budget displayed Pasta Carbonara at `$11.47` full cost, `$5.99` additional purchase cost, and “Within your budget”; Vegetable Stir-Fry showed `$8.46` additional cost and “Over your budget.”
+- The browser loaded and executed the updated JavaScript. YAML parsing through PyYAML was unavailable because the `yaml` package is not installed; no dependency was added.
+- No commit or push was performed.
+
+### XML10 model reconciliation
+
+- F.2.4.3 now maps to `specify_already_owned_recipe_ingredients`, which prepares the normalized, deduplicated ownership context before submission.
+- F.2.4.4 now maps to `submit_recipe_and_pricing_requests`; recipe generation and pricing remain separate stub calls.
+- The service-level cost calculation is intentionally documented as an unallocated model responsibility. No new Innoslate function or requirement ID was created.
+- Reviewer and assistant/model fields remain for manual confirmation.
+
+### XML10 reconciliation verification
+
+- `python -m pytest -q`: 39 passed.
+- `git diff --check`: passed.
+- Pylance syntax checks found no syntax errors in `recipe_service.py` or `user_interface/routes.py`.
+- No commit or push was performed.
+
+## 2026-11-02 — Phase 6 live LLM API integration
+
+- Date: 2026-11-02
+- Team member(s): [Manual confirmation required]
+- Assistant / model: [Manual confirmation required]
+- Built from:
+  - `app.py`, `recipe_service.py`, `llm_api_interface/`, and `grocery_store_interface/`
+  - `user_interface/`, the v1 API contract, existing tests, and CI workflow
+  - `docs/environment.md`, `docs/route-table.md`, and `docs/traceability.md`
+  - `Recipe Roulette (10).xml` — latest identified architecture export
+  - Phase 6 implementation approval and approved retry, pricing-deviation, and deferred-cache decisions
+- Prompt reference:
+  - Saved prompt: `docs/prompts/2026-11-02-phase6-live-llm-integration.md`
+- Reviewed by: [Manual confirmation required]
+
+### Accepted decisions
+
+- Add optional OpenAI recipe generation through the existing Python `llm_api_interface`; use deterministic stub mode by default.
+- Read the credential from `OPENAI_API_KEY` in the server environment. Do not expose it to the browser or store it in source control.
+- Send ingredients, budget, and dietary restrictions to OpenAI; require strict structured output with only recipe names and ingredient names, then validate locally.
+- Preserve the request schema, success-response fields, Phase 5 ownership and cost calculations, deterministic grocery pricing, browser workflow, and Chapter 2 console workflow.
+- Do not let the LLM generate or estimate prices. Document XML10's LLM/web-search pricing path as a model deviation and request a later model update.
+- Retry transient provider failures only, with at most ten total attempts; disable SDK retries to enforce the bound.
+- Defer caching, recommendation reuse, and application-wide spend enforcement. Do not add a database or persistent state; record the corresponding model requirements as pending.
+- Keep the F.2.1 Login Approved prerequisite explicitly simulated; no authentication is implemented.
+
+### Rejected / deferred scope
+
+- Do not implement live grocery pricing, web scraping, LLM-generated prices, real authentication, browser-side API calls, or frontend credential handling.
+- Do not add caching, persistent recommendation storage, or a cumulative application spend cap in this phase.
+- Do not change the existing request schema or successful response schema.
+- Do not invent missing Innoslate function, component, ICOM, or requirement identifiers.
+- Do not commit or push.
+
+### Assistant assumptions and disposition
+
+- Assumption: structured recipe output can be converted to the existing recipe/ingredient shape without changing the pricing boundary.
+  - Disposition: approved; the adapter returns only names and ingredients, and the existing deterministic pricing call remains separate.
+- Assumption: the ten-attempt limit means ten total attempts, including the initial request.
+  - Disposition: explicitly approved; XML10's differing retry wording and missing retry flow are documented for model reconciliation.
+- Assumption: no persistent retry deduplication or spend ledger is in scope.
+  - Disposition: approved deferral; related model requirements remain pending and repeated client requests can incur additional provider usage.
+
+### Verification
+
+- `python -m pytest -q`: 51 passed, including mocked OpenAI success, timeout/retry, exhausted-retry, malformed-output, missing-credential, route-failure, and Phase 5 pricing/ownership coverage.
+- `git diff --check`: passed.
+- Pylance syntax checks found no syntax errors in the new adapter, error module, LLM interface, or Flask routes; diagnostics for the adapter and routes were empty.
+- No live OpenAI request was made. Tests used a fake SDK client; no credentials were required.
 - No commit or push was performed.
