@@ -293,3 +293,54 @@ Notes / follow-ups:
 - `git diff --check`: passed.
 - Pylance syntax checks found no syntax errors in `recipe_service.py` or `user_interface/routes.py`.
 - No commit or push was performed.
+
+## 2026-11-02 — Phase 6 live LLM API integration
+
+- Date: 2026-11-02
+- Team member(s): [Manual confirmation required]
+- Assistant / model: [Manual confirmation required]
+- Built from:
+  - `app.py`, `recipe_service.py`, `llm_api_interface/`, and `grocery_store_interface/`
+  - `user_interface/`, the v1 API contract, existing tests, and CI workflow
+  - `docs/environment.md`, `docs/route-table.md`, and `docs/traceability.md`
+  - `Recipe Roulette (10).xml` — latest identified architecture export
+  - Phase 6 implementation approval and approved retry, pricing-deviation, and deferred-cache decisions
+- Prompt reference:
+  - Saved prompt: `docs/prompts/2026-11-02-phase6-live-llm-integration.md`
+- Reviewed by: [Manual confirmation required]
+
+### Accepted decisions
+
+- Add optional OpenAI recipe generation through the existing Python `llm_api_interface`; use deterministic stub mode by default.
+- Read the credential from `OPENAI_API_KEY` in the server environment. Do not expose it to the browser or store it in source control.
+- Send ingredients, budget, and dietary restrictions to OpenAI; require strict structured output with only recipe names and ingredient names, then validate locally.
+- Preserve the request schema, success-response fields, Phase 5 ownership and cost calculations, deterministic grocery pricing, browser workflow, and Chapter 2 console workflow.
+- Do not let the LLM generate or estimate prices. Document XML10's LLM/web-search pricing path as a model deviation and request a later model update.
+- Retry transient provider failures only, with at most ten total attempts; disable SDK retries to enforce the bound.
+- Defer caching, recommendation reuse, and application-wide spend enforcement. Do not add a database or persistent state; record the corresponding model requirements as pending.
+- Keep the F.2.1 Login Approved prerequisite explicitly simulated; no authentication is implemented.
+
+### Rejected / deferred scope
+
+- Do not implement live grocery pricing, web scraping, LLM-generated prices, real authentication, browser-side API calls, or frontend credential handling.
+- Do not add caching, persistent recommendation storage, or a cumulative application spend cap in this phase.
+- Do not change the existing request schema or successful response schema.
+- Do not invent missing Innoslate function, component, ICOM, or requirement identifiers.
+- Do not commit or push.
+
+### Assistant assumptions and disposition
+
+- Assumption: structured recipe output can be converted to the existing recipe/ingredient shape without changing the pricing boundary.
+  - Disposition: approved; the adapter returns only names and ingredients, and the existing deterministic pricing call remains separate.
+- Assumption: the ten-attempt limit means ten total attempts, including the initial request.
+  - Disposition: explicitly approved; XML10's differing retry wording and missing retry flow are documented for model reconciliation.
+- Assumption: no persistent retry deduplication or spend ledger is in scope.
+  - Disposition: approved deferral; related model requirements remain pending and repeated client requests can incur additional provider usage.
+
+### Verification
+
+- `python -m pytest -q`: 51 passed, including mocked OpenAI success, timeout/retry, exhausted-retry, malformed-output, missing-credential, route-failure, and Phase 5 pricing/ownership coverage.
+- `git diff --check`: passed.
+- Pylance syntax checks found no syntax errors in the new adapter, error module, LLM interface, or Flask routes; diagnostics for the adapter and routes were empty.
+- No live OpenAI request was made. Tests used a fake SDK client; no credentials were required.
+- No commit or push was performed.

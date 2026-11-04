@@ -1,6 +1,9 @@
 # Ignore Python bytecode files
 *.pyc
 .venv/
+.env
+.env.*
+!.env.example
 
 # Ignore Specific Innoslate Files and Example Images
 Recipe Roulette*.xml

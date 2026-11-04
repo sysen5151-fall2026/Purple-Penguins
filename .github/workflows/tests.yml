@@ -20,4 +20,6 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Run tests
+        env:
+          RECIPE_GENERATION_MODE: stub
         run: python -m pytest

@@ -3,10 +3,10 @@ info:
   title: Recipe Roulette API
   version: 1.0.0
   description: >-
-    Implemented recipe-generation workflow using deterministic local recipe
-    and pricing stubs. Ingredient ownership affects estimated additional
-    purchase cost; this is not a production recommendation or live grocery
-    pricing service.
+    Recipe generation defaults to deterministic local recipes and can be
+    configured to use OpenAI. Grocery pricing remains deterministic in every
+    mode. Ingredient ownership affects estimated additional purchase cost;
+    this is not live grocery pricing or a production recommendation.
 paths:
   /api/v1/recipes:
     post:
@@ -14,8 +14,8 @@ paths:
       summary: Generate recipe recommendations and estimated pricing
       description: >-
         Accepts ingredients the user already owns, a budget, and dietary
-        restrictions; returns deterministic recipe and pricing data with
-        ownership-aware additional purchase costs.
+        restrictions; returns recipes from the configured generation mode and
+        deterministic pricing data with ownership-aware additional purchase costs.
       requestBody:
         required: true
         content:
@@ -24,7 +24,9 @@ paths:
               $ref: "#/components/schemas/RecipeGenerationRequest"
       responses:
         "200":
-          description: Recipe recommendations with estimated ingredient prices and totals.
+          description: >-
+            Recipe recommendations with deterministic estimated ingredient
+            prices and totals. Response fields are unchanged across generation modes.
           content:
             application/json:
               schema:
@@ -37,6 +39,18 @@ paths:
                 $ref: "#/components/schemas/ValidationError"
         "500":
           description: Recipe generation or pricing failed unexpectedly.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackendFailure"
+        "502":
+          description: The configured upstream recipe provider returned unusable data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackendFailure"
+        "503":
+          description: Live recipe generation is not configured or is unavailable.
           content:
             application/json:
               schema:

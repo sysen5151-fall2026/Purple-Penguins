@@ -9,6 +9,10 @@
   const restrictionsInput = document.querySelector("#dietary-restrictions");
   const generateButton = document.querySelector("#generate-button");
   const buttonLabel = generateButton.querySelector(".button-label");
+  const recipeSource =
+    form.dataset.generationMode === "openai"
+      ? "OpenAI-generated"
+      : "demonstration";
   const formStatus = document.querySelector("#form-status");
   const resultsSection = document.querySelector(".results");
   const resultsList = document.querySelector("#results-list");
@@ -91,7 +95,7 @@
 
     const message = document.createElement("p");
     message.textContent =
-      "Try again later. The demonstration service returned an empty recipe list.";
+      `Try again later. The ${recipeSource} service returned an empty recipe list.`;
 
     emptyState.append(icon, heading, message);
     resultsList.append(emptyState);
@@ -214,7 +218,7 @@
     generateButton.disabled = true;
     resultsSection.setAttribute("aria-busy", "true");
     buttonLabel.textContent = "Spinning...";
-    formStatus.textContent = "Requesting demonstration recipes...";
+    formStatus.textContent = `Requesting ${recipeSource} recipes...`;
     formStatus.dataset.state = "";
 
     try {
@@ -265,8 +269,8 @@
       renderRecipes(payload.recipes);
       formStatus.textContent =
         payload.recipes.length === 0
-          ? "No demonstration recipes were returned."
-          : `Showing ${payload.recipes.length} demonstration recipe(s).`;
+          ? `No ${recipeSource} recipes were returned.`
+          : `Showing ${payload.recipes.length} ${recipeSource} recipe(s).`;
     } catch {
       showError(
         "Could not reach Recipe Roulette. Check your connection and try again."

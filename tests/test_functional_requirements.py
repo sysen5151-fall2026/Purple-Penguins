@@ -46,6 +46,15 @@ def test_homepage_contains_recipe_preference_controls_and_demo_notices(client):
     assert b"Verify ingredients and allergens yourself" in page
 
 
+def test_live_mode_homepage_discloses_external_generation(monkeypatch):
+    monkeypatch.setenv("RECIPE_GENERATION_MODE", "openai")
+    response = app.create_app({"TESTING": True}).test_client().get("/")
+
+    assert response.status_code == 200
+    assert b"sent from the server to OpenAI" in response.data
+    assert b"Grocery prices remain fixed demonstration estimates" in response.data
+
+
 def test_homepage_loads_recipe_interface_assets(client):
     css_response = client.get("/static/css/style.css")
     js_response = client.get("/static/js/recipe-roulette.js")
