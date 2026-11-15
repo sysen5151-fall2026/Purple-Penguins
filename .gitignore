@@ -8,3 +8,6 @@
 # Ignore Specific Innoslate Files and Example Images
 Recipe Roulette*.xml
 website example image.png
+
+# Ignore results from chapter 10-4
+results/chapter10-4

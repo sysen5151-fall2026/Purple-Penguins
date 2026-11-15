@@ -8,6 +8,7 @@ import copy
 import os
 
 from grocery_store_interface import get_ingredient_pricing
+from pricing_timing import measure_stage
 
 from .errors import RecipeGenerationServiceError
 
@@ -114,29 +115,32 @@ def get_pricing(recipes):
         List of recipes with pricing data added.
     """
     # Call 14: LLM API → Grocery Store: Retrieve Prices
-    all_ingredients = set()
-    for recipe in recipes:
-        all_ingredients.update(recipe["ingredients"])
-    
+    with measure_stage("pricing_request_processing"):
+        all_ingredients = set()
+        for recipe in recipes:
+            all_ingredients.update(recipe["ingredients"])
+        ingredient_names = list(all_ingredients)
+
     print("[LLM API] Requesting pricing from Grocery Store...")
     # Call 15: Grocery Store → LLM API: Provide Pricing
-    pricing = get_ingredient_pricing(list(all_ingredients))
+    pricing = get_ingredient_pricing(ingredient_names)
     print("[LLM API] Received pricing data.")
     print()
-    
+
     # Call 16: Process and attach pricing to recipes
-    recipes_with_pricing = []
-    for recipe in recipes:
-        total_cost = 0.0
-        recipe_with_pricing = {
-            "name": recipe["name"],
-            "ingredients": {},
-        }
-        for ingredient in recipe["ingredients"]:
-            price = pricing.get(ingredient, 0.0)
-            recipe_with_pricing["ingredients"][ingredient] = price
-            total_cost += price
-        recipe_with_pricing["total_cost"] = total_cost
-        recipes_with_pricing.append(recipe_with_pricing)
-    
+    with measure_stage("pricing_response_processing"):
+        recipes_with_pricing = []
+        for recipe in recipes:
+            total_cost = 0.0
+            recipe_with_pricing = {
+                "name": recipe["name"],
+                "ingredients": {},
+            }
+            for ingredient in recipe["ingredients"]:
+                price = pricing.get(ingredient, 0.0)
+                recipe_with_pricing["ingredients"][ingredient] = price
+                total_cost += price
+            recipe_with_pricing["total_cost"] = total_cost
+            recipes_with_pricing.append(recipe_with_pricing)
+
     return recipes_with_pricing

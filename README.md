@@ -58,3 +58,47 @@ Run the test suite from the repository root:
 ```powershell
 python -m pytest
 ```
+
+## Chapter 10.4 Pricing Benchmarks
+
+The local benchmark measures the existing in-memory ingredient-price lookup
+and Python processing using the same fixed ingredient names as the isolated
+LLM pricing experiment. It does not execute recipe generation, browser input,
+web scraping, or a database query.
+
+Run 30 local measurements:
+
+```powershell
+python -m scripts.benchmark_pricing --mode local --runs 30 --max-requests 30
+```
+
+LLM pricing is experimental and returns unverified estimates, not store
+prices. It is isolated from Recipe Roulette's production recipe/pricing path.
+Live requests require `--mode llm --live`, an explicit per-invocation cap, and
+typing the confirmation phrase. The SDK retry count is zero, so a 30-run
+benchmark sends at most 30 API requests. Each request may incur charges.
+
+After separately reviewing and approving the live experiment, configure
+`OPENAI_API_KEY` and, optionally, `OPENAI_MODEL` in the process environment,
+then run:
+
+```powershell
+python -m scripts.benchmark_pricing --mode llm --live --runs 30 --max-requests 30 --output results/chapter10-4/llm-pricing-30.csv
+```
+
+The benchmark refuses to overwrite a result CSV. Its output path is printed
+after each run; local and live timings use nanoseconds and include per-stage
+status and retry counts. Summarize and compare one or more result files with
+the team-provided Innoslate simulation reference:
+
+```powershell
+$localCsv = Get-ChildItem results\chapter10-4\local-*.csv |
+  Sort-Object LastWriteTime |
+  Select-Object -Last 1 -ExpandProperty FullName
+python -m scripts.analyze_pricing_benchmark --input $localCsv
+```
+
+See [the Chapter 10.4 methodology](docs/performance/chapter10-4-methodology.md)
+for modeled action traceability, CSV columns, simulation values, and comparison
+limitations. The current XML export contains no S.3 pricing sequence; do not
+treat the experimental LLM run as an implemented or simulated S.3 scenario.

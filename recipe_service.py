@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import TypedDict
 
 from llm_api_interface import request_pricing, send_recipe_requirements
+from pricing_timing import measure_stage
 
 
 class RecipeRequest(TypedDict):
@@ -79,14 +80,15 @@ def identify_owned_recipe_ingredients(
     user_owned_ingredients: list[str],
 ) -> list[bool]:
     """Return exact, case-insensitive ownership matches in recipe order."""
-    owned_names = {
-        _normalize_ingredient_name(ingredient)
-        for ingredient in user_owned_ingredients
-    }
-    return [
-        _normalize_ingredient_name(ingredient) in owned_names
-        for ingredient in recipe_ingredients
-    ]
+    with measure_stage("ingredient_ownership_matching"):
+        owned_names = {
+            _normalize_ingredient_name(ingredient)
+            for ingredient in user_owned_ingredients
+        }
+        return [
+            _normalize_ingredient_name(ingredient) in owned_names
+            for ingredient in recipe_ingredients
+        ]
 
 
 def calculate_recipe_costs(
@@ -94,20 +96,23 @@ def calculate_recipe_costs(
     budget: float,
 ) -> RecipeCostSummary:
     """Calculate full and additional costs using whole-cent arithmetic."""
-    full_cost_cents = 0
-    additional_cost_cents = 0
-    for ingredient in priced_ingredients:
-        price_cents = _price_to_cents(ingredient["estimated_price"])
-        full_cost_cents += price_cents
-        if not ingredient["owned"]:
-            additional_cost_cents += price_cents
+    with measure_stage("recipe_cost_calculation"):
+        full_cost_cents = 0
+        additional_cost_cents = 0
+        for ingredient in priced_ingredients:
+            price_cents = _price_to_cents(ingredient["estimated_price"])
+            full_cost_cents += price_cents
+            if not ingredient["owned"]:
+                additional_cost_cents += price_cents
 
-    additional_cost = Decimal(additional_cost_cents) / 100
-    return {
-        "estimated_total_cost": _dollars_from_cents(full_cost_cents),
-        "additional_purchase_cost": _dollars_from_cents(additional_cost_cents),
-        "within_budget": additional_cost <= Decimal(str(budget)),
-    }
+        additional_cost = Decimal(additional_cost_cents) / 100
+        return {
+            "estimated_total_cost": _dollars_from_cents(full_cost_cents),
+            "additional_purchase_cost": _dollars_from_cents(
+                additional_cost_cents
+            ),
+            "within_budget": additional_cost <= Decimal(str(budget)),
+        }
 
 
 def prepare_recipe_request(

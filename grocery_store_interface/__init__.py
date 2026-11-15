@@ -4,6 +4,9 @@ Handles Call 14-15: LLM API requests pricing; Grocery Store returns hard-coded p
 No real web scraping or external access.
 """
 
+from pricing_timing import measure_stage
+
+
 # Hard-coded stub ingredient pricing (Call 15: Grocery Store → LLM API: Provide Pricing)
 _STUB_PRICING = {
     "pasta": 1.99,
@@ -31,12 +34,12 @@ def get_ingredient_pricing(ingredients):
     print(f"[Grocery Store] Received pricing request for {len(ingredients)} ingredients.")
     
     pricing = {}
-    for ingredient in ingredients:
-        # Return stub price or default
-        pricing[ingredient] = _STUB_PRICING.get(ingredient, 1.00)
+    with measure_stage("in_memory_lookup"):
+        for ingredient in ingredients:
+            # Return stub price or default
+            pricing[ingredient] = _STUB_PRICING.get(ingredient, 1.00)
     
     print(f"[Grocery Store] Returning pricing data ({len(pricing)} items).")
     print()
     
     return pricing
-

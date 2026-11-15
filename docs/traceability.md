@@ -106,3 +106,40 @@ XML10 contains a retry-limit inconsistency: STH.1.1.14 describes up to ten retry
 - F.2.5 receives Error Response and emits “Retry (Up to 10 Times),” but the diagram shows no flow that resubmits the request to F.2.4. Phase 6 implements transient retries as up to ten total attempts, following Sys.2.4.2; update the diagram and reconcile it with STH.1.1.14.
 - F.2.8 classifies Shopping List Modifications as a control. If this represents a user’s requested edits, it may be better modeled as an input; if it represents rules governing edits, a control is reasonable. Confirm the intended meaning before implementation.
 - Apart from the verified C.2.4 subsystem-level links to requirements 2.7.1, 2.8.1, and 2.9.1, direct requirement relationships for individual F.2 functions and subfunctions remain Pending Verification.
+
+## Chapter 10.4 pricing benchmark traceability
+
+The latest `Recipe Roulette Export.xml` contains simulation-bearing scenario
+roots **S.1 Webscraping** (`I_293FF5YECAK8A_BDX2FTR813SDP`) and **S.2 Database**
+(`I_F1H8BF80Z8GJC_8FGHTP2SG9K2S`). Their participant assets are User
+(`I_3RKA1K727YKNZ_95TTAV7FWXJPM`) and App
+(`I_B0312FGXERG7B_BWY173TC0M5DY`); S.1 additionally has Grocery Store Website
+(`I_9TDEK0SCJ8J4T_90DD1GZVR5P1F`), while S.2 has Database
+(`I_24D51EK49RKVC_BJHJFM0C6EY5P`). The table distinguishes a verified model
+action from an experimental implementation mapping.
+
+| Measurement stage | Python boundary | Innoslate action / participant boundary | Mapping status |
+|---|---|---|---|
+| `pricing_request_processing` | `llm_api_interface.get_pricing` collects unique ingredient names before calling the pricing interface | S.1.1 Request prices for Unbought Ingredients (`I_B6CN15D638J7B_9DJTNN4BBD40S`); S.2.1 Request Pricing For Prospective Ingredients (`I_BCW3NPAY06H7R_94DNF2DG7EGFV`); App boundary | Function boundary verified; application behavior is local, not an external scenario request |
+| `in_memory_lookup` | `grocery_store_interface.get_ingredient_pricing` dictionary loop | S.2.2 Lookup Unbought Ingredients (`I_D1TWDBN3V4KDD_8STG5Q336F9B4`); Database participant boundary | **Analog only.** The function reads an in-memory Python dictionary, not the modeled Database participant or a database |
+| `pricing_response_processing` | `llm_api_interface.get_pricing` attaches prices and computes the returned recipe subtotal | S.1.6 Extract Pricing Data (`I_5Q3W7HG65EG35_89219FPNCCBNE`), S.1.7 Display Recipe and Pricing (`I_B574M42QW4KK2_ABDCRP983PS6W`); S.2.3 Display Recipe and Pricing Results (`I_6BBS9AH3X8HN6_BGQ9K1HZA5Y14`) | Proposed/partial correspondence; no web-page extraction occurs |
+| `ingredient_ownership_matching` | `recipe_service.identify_owned_recipe_ingredients` | No separate S.1/S.2 action identified | Measured implementation detail; no model action assigned |
+| `recipe_cost_calculation` | `recipe_service.calculate_recipe_costs` | Pricing/result display actions S.1.7 and S.2.3 | Proposed correspondence only; no separate cost-calculation action is allocated |
+| `pricing_workflow_total` | Benchmark wraps `request_pricing` plus ownership and recipe-cost processing | S.1.1–S.1.8 and S.2.1–S.2.4, including S.1.8 Receive Recipe and Pricing Information (`I_2920TW22R4K1B_AB0GBRC5KKK1D`), S.2.4 Receive Recipe and Pricing (`I_AB8ZE7DJPWJQ9_9Y2J87WH0VDCM`) | Actual code timing; not duration-equivalent to either simulated architecture |
+| `llm_pricing_attempt` and `pricing_response_validation` | Isolated `llm_api_interface.pricing_estimator` request and local schema validation | **No S.3 pricing sequence/action or S.3 participant boundary is present in the inspected export** | Proposed experiment only; not traceable to an existing S.3 ID |
+
+S.1 additionally models webpage request/receipt, parsing, and price extraction:
+S.1.2 (`I_E0YKN30Z5EJTY_97843X9ZFQS26`), S.1.3
+(`I_5KFGA727G0KB2_9F0RZHFEXBYS1`), S.1.4
+(`I_BNC16EWQB6KKP_AADC99C1P2WMX`), and S.1.5
+(`I_FWXSPC1D7JH0Y_AYHAHN893XGJ8`). None has a Python implementation in this
+repository. S.2's database lookup is likewise unimplemented. The current
+`$1.00` fallback for unknown ingredient names is part of the in-memory
+implementation, not a modeled database response.
+
+The experimental LLM pricing module does not replace production pricing or
+recipe generation. Its request/validation timings are proposed measurements
+against the LLM API boundary; they do not establish an S.3 model mapping. The
+current export has a separate non-simulation `Database scenario` entity also
+numbered S.2 (`I_C2XSPABGH6GRC_A22Z9Z9V1VQGG`); the traceability above uses the
+S.2 `Database` root with the action sequence and participant assets.
