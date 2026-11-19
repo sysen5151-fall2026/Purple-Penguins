@@ -8,6 +8,10 @@ Meal planning is a time-consuming laborious process that everyone deals with. Di
 
 Individuals that struggle with the previously mentioned constraints are the primary audience to experience meal planning issues. Existing meal planning leads to a non-nutritional diet, improper budgeting, and meals that take longer to shop for than they do to cook. There is a clear difficulty in balancing: cost, dietary restrictions, and preferences while maintaining a nutritional and healthy diet.
 
+<p align="center">
+<img src="OPSCON_img.png" alt="Diagram" width="500">
+</p>
+
 ## Development Setup
 
 The project targets Python 3.12. From the repository root, create and activate a virtual environment, then install the project dependencies:
