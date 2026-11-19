@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Explore Recipe Roulette demonstration recipes">
+    <meta name="description" content="Explore Recipe Roulette recipe ideas and estimated pricing">
     <title>Recipe Roulette</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="{{ url_for('static', filename='js/recipe-roulette.js') }}" defer></script>
@@ -25,10 +25,21 @@
           you are not authenticated.
         </p>
         <p class="demo-notice data-notice">
-          <strong>Demonstration data:</strong> The API returns fixed recipes
-          and estimated stub prices. Your ingredients, budget, and dietary
-          restrictions do not filter the results. Recipes may not fit your
-          budget or dietary needs; verify ingredients and allergens yourself.
+          {% if recipe_generation_mode == "openai" %}
+            <strong>Live recipe generation:</strong> Your ingredients, budget,
+            and dietary restrictions are sent from the server to OpenAI to
+            generate recipe ideas. Do not submit sensitive information.
+          {% elif recipe_generation_mode == "stub" %}
+            <strong>Demonstration recipes:</strong> Recipe suggestions come
+            from a fixed local stub. Owned ingredients do not change which recipes are returned.
+          {% else %}
+            <strong>Configuration issue:</strong> Recipe generation mode is not
+            configured correctly.
+          {% endif %}
+          Grocery prices remain fixed demonstration estimates in every mode.
+          Owned ingredients adjust the additional-purchase estimate; results
+          are not filtered by budget. Dietary restrictions may not be enforced,
+          and allergen safety is not guaranteed. Verify ingredients and allergens yourself.
         </p>
       </section>
 
@@ -53,9 +64,13 @@
             <span class="step-badge" aria-hidden="true">01</span>
           </div>
 
-          <form id="recipe-form" novalidate>
+          <form
+            id="recipe-form"
+            data-generation-mode="{{ recipe_generation_mode }}"
+            novalidate
+          >
             <div class="field">
-              <label for="ingredients">Ingredients you have</label>
+              <label for="ingredients">Ingredients you already own</label>
               <textarea
                 id="ingredients"
                 name="ingredients"
@@ -66,7 +81,8 @@
                 required
               ></textarea>
               <p class="field-hint" id="ingredients-help">
-                Separate ingredients with commas or new lines.
+                Separate ingredients with commas or new lines. We assume you
+                have enough of each listed ingredient; quantities are not tracked.
               </p>
               <p class="field-error" id="ingredients-error"></p>
             </div>
@@ -124,13 +140,19 @@
               <p class="eyebrow">Fresh from the roulette</p>
               <h2 id="results-title">Your recipe results</h2>
             </div>
-            <span class="results-note">Demo recipes</span>
+            <span class="results-note">
+              {% if recipe_generation_mode == "openai" %}
+                OpenAI-generated recipes
+              {% else %}
+                Demonstration pricing
+              {% endif %}
+            </span>
           </div>
           <div class="results-list" id="results-list" aria-live="polite">
             <div class="empty-state" id="empty-state">
               <span class="empty-icon" aria-hidden="true">✦</span>
               <h3>Ready when you are</h3>
-              <p>Add your preferences and spin to see the available demonstration recipes.</p>
+              <p>Add your preferences and spin to see recipe ideas with estimated demonstration pricing.</p>
             </div>
           </div>
         </section>

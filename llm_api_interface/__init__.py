@@ -1,10 +1,16 @@
-"""LLM API interface boundary for Chapter 2 walking skeleton.
+"""LLM API boundary for the Chapter 2 workflow and configurable generation.
 
-Handles recipe generation and pricing logic.
-Calls include Calls 11-16 of the baseline scenario sequence.
+Recipe pricing remains a separate operation delegated to the deterministic
+grocery-store interface. Calls include Calls 11-16 of the baseline sequence.
 """
 
+import copy
+import os
+
 from grocery_store_interface import get_ingredient_pricing
+from pricing_timing import measure_stage
+
+from .errors import RecipeGenerationServiceError
 
 
 # Hard-coded stub recipes (Call 12: LLM API → App: Generate Recipes)
@@ -20,31 +26,55 @@ _STUB_RECIPES = [
 ]
 
 
+def get_recipe_generation_mode() -> str:
+    """Return the configured provider mode, defaulting to deterministic stub."""
+    return os.getenv("RECIPE_GENERATION_MODE", "stub").strip().casefold()
+
+
 def send_recipe_requirements(ingredients, budget, dietary_restrictions):
-    """Call 11-12: App → LLM API: Send Recipe Requirements; LLM API → App: Generate Recipes.
-    
-    Receives recipe requirements and returns hard-coded stub recipes.
-    
+    """F.2.4.4 / C.2.4.4: generate recipes using the configured LLM API.
+
+    The default ``stub`` mode preserves the Chapter 2 walking-skeleton flow.
+    Optional ``openai`` mode uses the App-to-LLM API interface and returns
+    validated recipe names and ingredient lists without prices.
+
     Args:
         ingredients: List of available ingredients
         budget: Budget in dollars
         dietary_restrictions: List of dietary restrictions
-    
+
     Returns:
         List of recipe dicts (without pricing).
     """
-    # Call 11: App → LLM API: Send Recipe Requirements
-    print("[LLM API] Received recipe requirements.")
-    print(f"  Available ingredients: {ingredients}")
-    print(f"  Budget: ${budget:.2f}")
-    print(f"  Dietary restrictions: {dietary_restrictions}")
+    print(
+        "[LLM API] Received recipe requirements "
+        f"({len(ingredients)} available ingredient(s))."
+    )
+
+    mode = get_recipe_generation_mode()
+    if mode == "stub":
+        recipes = copy.deepcopy(_STUB_RECIPES)
+        print(f"[LLM API] Generated {len(recipes)} deterministic stub recipes.")
+    elif mode == "openai":
+        from .openai_adapter import generate_recipes
+
+        recipes = generate_recipes(
+            ingredients=ingredients,
+            budget=budget,
+            dietary_restrictions=dietary_restrictions,
+        )
+        print(f"[LLM API] Generated {len(recipes)} OpenAI recipe(s).")
+    else:
+        raise RecipeGenerationServiceError(
+            "Recipe generation is not configured. Please contact the "
+            "application administrator.",
+            status_code=503,
+            log_message=(
+                "RECIPE_GENERATION_MODE must be either 'stub' or 'openai'."
+            ),
+        )
     print()
-    
-    # Call 12: LLM API → App: Generate Recipes (stub)
-    recipes = _STUB_RECIPES
-    print(f"[LLM API] Generated {len(recipes)} stub recipes.")
-    print()
-    
+
     return recipes
 
 
@@ -85,30 +115,32 @@ def get_pricing(recipes):
         List of recipes with pricing data added.
     """
     # Call 14: LLM API → Grocery Store: Retrieve Prices
-    all_ingredients = set()
-    for recipe in recipes:
-        all_ingredients.update(recipe["ingredients"])
-    
+    with measure_stage("pricing_request_processing"):
+        all_ingredients = set()
+        for recipe in recipes:
+            all_ingredients.update(recipe["ingredients"])
+        ingredient_names = list(all_ingredients)
+
     print("[LLM API] Requesting pricing from Grocery Store...")
     # Call 15: Grocery Store → LLM API: Provide Pricing
-    pricing = get_ingredient_pricing(list(all_ingredients))
+    pricing = get_ingredient_pricing(ingredient_names)
     print("[LLM API] Received pricing data.")
     print()
-    
-    # Call 16: Process and attach pricing to recipes
-    recipes_with_pricing = []
-    for recipe in recipes:
-        total_cost = 0.0
-        recipe_with_pricing = {
-            "name": recipe["name"],
-            "ingredients": {},
-        }
-        for ingredient in recipe["ingredients"]:
-            price = pricing.get(ingredient, 0.0)
-            recipe_with_pricing["ingredients"][ingredient] = price
-            total_cost += price
-        recipe_with_pricing["total_cost"] = total_cost
-        recipes_with_pricing.append(recipe_with_pricing)
-    
-    return recipes_with_pricing
 
+    # Call 16: Process and attach pricing to recipes
+    with measure_stage("pricing_response_processing"):
+        recipes_with_pricing = []
+        for recipe in recipes:
+            total_cost = 0.0
+            recipe_with_pricing = {
+                "name": recipe["name"],
+                "ingredients": {},
+            }
+            for ingredient in recipe["ingredients"]:
+                price = pricing.get(ingredient, 0.0)
+                recipe_with_pricing["ingredients"][ingredient] = price
+                total_cost += price
+            recipe_with_pricing["total_cost"] = total_cost
+            recipes_with_pricing.append(recipe_with_pricing)
+
+    return recipes_with_pricing

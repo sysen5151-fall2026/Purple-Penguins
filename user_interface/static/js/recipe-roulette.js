@@ -9,6 +9,10 @@
   const restrictionsInput = document.querySelector("#dietary-restrictions");
   const generateButton = document.querySelector("#generate-button");
   const buttonLabel = generateButton.querySelector(".button-label");
+  const recipeSource =
+    form.dataset.generationMode === "openai"
+      ? "OpenAI-generated"
+      : "demonstration";
   const formStatus = document.querySelector("#form-status");
   const resultsSection = document.querySelector(".results");
   const resultsList = document.querySelector("#results-list");
@@ -91,7 +95,7 @@
 
     const message = document.createElement("p");
     message.textContent =
-      "Try again later. The demonstration service returned an empty recipe list.";
+      `Try again later. The ${recipeSource} service returned an empty recipe list.`;
 
     emptyState.append(icon, heading, message);
     resultsList.append(emptyState);
@@ -118,27 +122,59 @@
       ingredientList.className = "ingredient-list";
       recipe.ingredients.forEach((ingredient) => {
         const row = document.createElement("li");
-        row.className = "ingredient-row";
+        row.className = `ingredient-row ${
+          ingredient.owned ? "is-owned" : "needs-purchase"
+        }`;
 
         const name = document.createElement("span");
+        name.className = "ingredient-name";
         name.textContent = ingredient.name;
 
         const price = document.createElement("span");
+        price.className = "ingredient-price";
         price.textContent = currency.format(ingredient.estimated_price);
 
-        row.append(name, price);
+        const ownership = document.createElement("span");
+        ownership.className = `ingredient-ownership ${
+          ingredient.owned ? "owned" : "to-purchase"
+        }`;
+        ownership.textContent = ingredient.owned ? "Owned" : "Buy";
+
+        row.append(name, price, ownership);
         ingredientList.append(row);
       });
 
-      const total = document.createElement("p");
-      total.className = "recipe-total";
-      const totalLabel = document.createElement("span");
-      totalLabel.textContent = "Estimated total";
-      const totalPrice = document.createElement("span");
-      totalPrice.textContent = currency.format(recipe.estimated_total_cost);
-      total.append(totalLabel, totalPrice);
+      const costSummary = document.createElement("div");
+      costSummary.className = "recipe-cost-summary";
 
-      card.append(title, ingredientsHeading, ingredientList, total);
+      const fullCost = document.createElement("p");
+      fullCost.className = "recipe-total";
+      const fullCostLabel = document.createElement("span");
+      fullCostLabel.textContent = "Full recipe cost";
+      const fullCostPrice = document.createElement("span");
+      fullCostPrice.textContent = currency.format(recipe.estimated_total_cost);
+      fullCost.append(fullCostLabel, fullCostPrice);
+
+      const purchaseCost = document.createElement("p");
+      purchaseCost.className = "recipe-total";
+      const purchaseCostLabel = document.createElement("span");
+      purchaseCostLabel.textContent = "Additional purchase cost";
+      const purchaseCostPrice = document.createElement("span");
+      purchaseCostPrice.textContent = currency.format(
+        recipe.additional_purchase_cost
+      );
+      purchaseCost.append(purchaseCostLabel, purchaseCostPrice);
+
+      const budgetStatus = document.createElement("p");
+      budgetStatus.className = `budget-status ${
+        recipe.within_budget ? "within-budget" : "over-budget"
+      }`;
+      budgetStatus.textContent = recipe.within_budget
+        ? "Within your budget"
+        : "Over your budget";
+
+      costSummary.append(fullCost, purchaseCost, budgetStatus);
+      card.append(title, ingredientsHeading, ingredientList, costSummary);
       resultsList.append(card);
     });
   }
@@ -182,7 +218,7 @@
     generateButton.disabled = true;
     resultsSection.setAttribute("aria-busy", "true");
     buttonLabel.textContent = "Spinning...";
-    formStatus.textContent = "Requesting demonstration recipes...";
+    formStatus.textContent = `Requesting ${recipeSource} recipes...`;
     formStatus.dataset.state = "";
 
     try {
@@ -233,8 +269,8 @@
       renderRecipes(payload.recipes);
       formStatus.textContent =
         payload.recipes.length === 0
-          ? "No demonstration recipes were returned."
-          : `Showing ${payload.recipes.length} demonstration recipe(s).`;
+          ? `No ${recipeSource} recipes were returned.`
+          : `Showing ${payload.recipes.length} ${recipeSource} recipe(s).`;
     } catch {
       showError(
         "Could not reach Recipe Roulette. Check your connection and try again."
