@@ -1,0 +1,4 @@
+scenario_id,architecture,source,runs,minimum_duration_s,maximum_duration_s,mean_duration_s,median_duration_s,sample_standard_deviation_s,status
+S.1,Webscraping,Team-provided Innoslate simulation summary,10,4.05,30.96,17.185,,,completed
+S.2,Database,Team-provided Innoslate simulation summary,10,2.67,17.94,6.86,,,completed
+S.3,LLM pricing,Innoslate simulation,,,,,,,pending

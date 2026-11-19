@@ -10,4 +10,7 @@ Recipe Roulette*.xml
 website example image.png
 
 # Ignore results from chapter 10-4
-results/chapter10-4
+results/chapter10-4/*
+
+# Keep the Innoslate reference CSV
+!/results/chapter10-4/innoslate_reference.csv
