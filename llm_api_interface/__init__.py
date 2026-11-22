@@ -1,8 +1,4 @@
-"""LLM API boundary for the Chapter 2 workflow and configurable generation.
-
-Recipe pricing remains a separate operation delegated to the deterministic
-grocery-store interface. Calls include Calls 11-16 of the baseline sequence.
-"""
+"""LLM API boundary for configurable recipe generation and price estimates."""
 
 import copy
 import os
@@ -78,10 +74,8 @@ def send_recipe_requirements(ingredients, budget, dietary_restrictions):
     return recipes
 
 
-def request_pricing(recipes):
-    """Call 13-16: App → LLM API: Request Pricing; LLM API → Grocery Store → LLM API → App.
-    
-    Requests pricing for recipes, calls Grocery Store stub, and returns recipes with pricing.
+def request_pricing(recipes, *, store=None, zip_code=None):
+    """Request local demonstration prices or OpenAI estimates for a store/ZIP.
     
     Args:
         recipes: List of recipe dicts (without pricing)
@@ -93,8 +87,12 @@ def request_pricing(recipes):
     print("[LLM API] Received pricing request for recipes.")
     print()
     
-    # Calls 14-15: LLM API → Grocery Store → LLM API
-    recipes_with_pricing = get_pricing(recipes)
+    # Calls 14-15: LLM API → price source → LLM API
+    recipes_with_pricing = get_pricing(
+        recipes,
+        store=store,
+        zip_code=zip_code,
+    )
     
     # Call 16: LLM API → App: Process Ingredient Pricing
     print("[LLM API] Processed ingredient pricing.")
@@ -103,8 +101,8 @@ def request_pricing(recipes):
     return recipes_with_pricing
 
 
-def get_pricing(recipes):
-    """Internal helper: calls Grocery Store stub and processes pricing for recipes.
+def get_pricing(recipes, *, store=None, zip_code=None):
+    """Collect ingredient names, price them, and attach prices to recipes.
     
     Implements Calls 14-16 of the sequence (internal to request_pricing).
     
@@ -114,17 +112,36 @@ def get_pricing(recipes):
     Returns:
         List of recipes with pricing data added.
     """
-    # Call 14: LLM API → Grocery Store: Retrieve Prices
+    # Call 14: LLM API: prepare distinct recipe ingredient names.
     with measure_stage("pricing_request_processing"):
-        all_ingredients = set()
+        all_ingredients = {}
         for recipe in recipes:
-            all_ingredients.update(recipe["ingredients"])
+            for ingredient in recipe["ingredients"]:
+                all_ingredients.setdefault(ingredient, None)
         ingredient_names = list(all_ingredients)
 
-    print("[LLM API] Requesting pricing from Grocery Store...")
-    # Call 15: Grocery Store → LLM API: Provide Pricing
-    pricing = get_ingredient_pricing(ingredient_names)
-    print("[LLM API] Received pricing data.")
+    use_openai_estimates = (
+        get_recipe_generation_mode() == "openai"
+        and store is not None
+        and zip_code is not None
+    )
+    if use_openai_estimates:
+        from .pricing_estimator import estimate_store_prices
+
+        print(
+            "[LLM API] Requesting estimated prices from OpenAI for "
+            f"{store} in ZIP {zip_code}..."
+        )
+        pricing = estimate_store_prices(
+            ingredient_names,
+            store=store,
+            zip_code=zip_code,
+        )
+        print("[LLM API] Received OpenAI price estimates.")
+    else:
+        print("[LLM API] Requesting demonstration prices from Grocery Store...")
+        pricing = get_ingredient_pricing(ingredient_names)
+        print("[LLM API] Received demonstration pricing.")
     print()
 
     # Call 16: Process and attach pricing to recipes

@@ -159,6 +159,88 @@ def test_llm_pricing_response_requires_exact_finite_estimates():
     assert result[2]["estimated_price_usd"] == 2.49
 
 
+def test_llm_price_estimate_request_includes_store_and_zip_context():
+    request_input = pricing_estimator.build_pricing_request(
+        ["pasta"],
+        store="Walmart",
+        zip_code="00501",
+    )
+
+    assert json.loads(request_input[1]["content"]) == {
+        "ingredients": ["pasta"],
+        "store": "Walmart",
+        "zip_code": "00501",
+    }
+    assert "do not have live access" in request_input[0]["content"].casefold()
+    assert (
+        "do not claim that any estimate is current or verified"
+        in request_input[0]["content"].casefold()
+    )
+
+
+def test_estimate_store_prices_uses_mocked_openai_with_location_context(
+    monkeypatch,
+):
+    captured = {}
+    output = json.dumps(
+        {
+            "prices": [
+                {"ingredient": "pasta", "estimated_price_usd": 3.25},
+            ]
+        }
+    )
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(output_text=output)
+
+    class FakeClient:
+        def __init__(self, *, api_key, timeout, max_retries):
+            assert api_key == "test-only-key"
+            assert timeout == 30.0
+            assert max_retries == 0
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr(pricing_estimator, "OpenAI", FakeClient)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
+
+    prices = pricing_estimator.estimate_store_prices(
+        ["pasta"],
+        store="Wegmans",
+        zip_code="00501",
+    )
+
+    assert prices == {"pasta": 3.25}
+    assert json.loads(captured["input"][1]["content"]) == {
+        "ingredients": ["pasta"],
+        "store": "Wegmans",
+        "zip_code": "00501",
+    }
+
+
+def test_store_estimator_maps_missing_credentials_to_safe_service_error(
+    monkeypatch,
+):
+    from llm_api_interface.errors import RecipeGenerationServiceError
+
+    def fail_client():
+        raise PricingBenchmarkError("missing_api_key")
+
+    monkeypatch.setattr(pricing_estimator, "create_pricing_client", fail_client)
+
+    with pytest.raises(RecipeGenerationServiceError) as error:
+        pricing_estimator.estimate_store_prices(
+            ["pasta"],
+            store="Walmart",
+            zip_code="14850",
+        )
+
+    assert error.value.status_code == 503
+    assert "temporarily unavailable" in error.value.public_message
+    assert "OPENAI_API_KEY" not in error.value.public_message
+
+
 @pytest.mark.parametrize(
     "output_text",
     [
@@ -192,6 +274,21 @@ def test_llm_pricing_response_rejects_malformed_or_unmatched_values(
 ):
     with pytest.raises(PricingBenchmarkError):
         pricing_estimator.validate_price_estimates(output_text, _INGREDIENTS)
+
+
+def test_llm_pricing_response_rejects_unrepresentable_price():
+    output = json.dumps(
+        {
+            "prices": [
+                {"ingredient": "pasta", "estimated_price_usd": 10**400},
+            ]
+        }
+    )
+
+    with pytest.raises(PricingBenchmarkError) as error:
+        pricing_estimator.validate_price_estimates(output, ["pasta"])
+
+    assert error.value.failure_code == "invalid_estimated_price"
 
 
 def test_pricing_client_uses_server_config_and_disables_sdk_retries(monkeypatch):

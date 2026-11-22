@@ -26,17 +26,21 @@
         </p>
         <p class="demo-notice data-notice">
           {% if recipe_generation_mode == "openai" %}
-            <strong>Live recipe generation:</strong> Your ingredients, budget,
-            and dietary restrictions are sent from the server to OpenAI to
-            generate recipe ideas. Do not submit sensitive information.
+            <strong>OpenAI estimates:</strong> Your ingredients, budget, and
+            dietary restrictions are sent to OpenAI for recipe generation.
+            Your selected store and ZIP code are sent in a separate request for
+            estimated prices. These are not live or verified store prices, and
+            OpenAI usage may incur charges. Do not submit other sensitive
+            information.
           {% elif recipe_generation_mode == "stub" %}
             <strong>Demonstration recipes:</strong> Recipe suggestions come
             from a fixed local stub. Owned ingredients do not change which recipes are returned.
+            Prices are fixed demonstrations; the selected store and ZIP code
+            are not used in stub mode.
           {% else %}
             <strong>Configuration issue:</strong> Recipe generation mode is not
             configured correctly.
           {% endif %}
-          Grocery prices remain fixed demonstration estimates in every mode.
           Owned ingredients adjust the additional-purchase estimate; results
           are not filtered by budget. Dietary restrictions may not be enforced,
           and allergen safety is not guaranteed. Verify ingredients and allergens yourself.
@@ -85,6 +89,48 @@
                 have enough of each listed ingredient; quantities are not tracked.
               </p>
               <p class="field-error" id="ingredients-error"></p>
+            </div>
+
+            <div class="location-store-fields">
+              <div class="field">
+                <label for="zip-code">ZIP code</label>
+                <input
+                  id="zip-code"
+                  name="zip_code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="postal-code"
+                  maxlength="10"
+                  placeholder="14850"
+                  aria-describedby="zip-code-help zip-code-error"
+                  aria-invalid="false"
+                  required
+                >
+                <p class="field-hint" id="zip-code-help">
+                  Enter a five-digit US ZIP code or ZIP+4.
+                </p>
+                <p class="field-error" id="zip-code-error"></p>
+              </div>
+
+              <div class="field">
+                <label for="store">Store</label>
+                <select
+                  id="store"
+                  name="store"
+                  aria-describedby="store-help store-error"
+                  aria-invalid="false"
+                  required
+                >
+                  <option value="" selected disabled>Select a store</option>
+                  {% for store in store_options %}
+                    <option value="{{ store }}">{{ store }}</option>
+                  {% endfor %}
+                </select>
+                <p class="field-hint" id="store-help">
+                  Choose the store for the price estimate.
+                </p>
+                <p class="field-error" id="store-error"></p>
+              </div>
             </div>
 
             <div class="field">
@@ -140,11 +186,11 @@
               <p class="eyebrow">Fresh from the roulette</p>
               <h2 id="results-title">Your recipe results</h2>
             </div>
-            <span class="results-note">
+            <span class="results-note" id="pricing-source-note">
               {% if recipe_generation_mode == "openai" %}
-                OpenAI-generated recipes
+                OpenAI price estimates (not live store prices)
               {% else %}
-                Demonstration pricing
+                Demonstration pricing (store and ZIP not used)
               {% endif %}
             </span>
           </div>
@@ -152,7 +198,7 @@
             <div class="empty-state" id="empty-state">
               <span class="empty-icon" aria-hidden="true">✦</span>
               <h3>Ready when you are</h3>
-              <p>Add your preferences and spin to see recipe ideas with estimated demonstration pricing.</p>
+              <p>Add your preferences and spin to see recipe ideas with estimated ingredient costs.</p>
             </div>
           </div>
         </section>

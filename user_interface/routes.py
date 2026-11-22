@@ -6,6 +6,7 @@ from llm_api_interface import get_recipe_generation_mode
 from llm_api_interface.errors import RecipeGenerationServiceError
 from recipe_service import (
     RecipeRequestValidationError,
+    STORE_OPTIONS,
     format_and_validate_api_request,
     specify_already_owned_recipe_ingredients,
     submit_recipe_and_pricing_requests,
@@ -20,6 +21,7 @@ def home():
     return render_template(
         "index.html",
         recipe_generation_mode=get_recipe_generation_mode(),
+        store_options=STORE_OPTIONS,
     )
 
 

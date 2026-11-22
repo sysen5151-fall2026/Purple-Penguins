@@ -1,6 +1,6 @@
 # F.2 Function Traceability
 
-**Status:** F.2.2 and F.2.3 have browser-interface implementations; F.2.4.1–F.2.4.4 implement request preparation, validation, ownership context, and submission; F.2.4.4 supports deterministic stub mode by default and optional OpenAI recipe generation; F.2.5 retries transient OpenAI failures; and F.2.7 displays backend results. Grocery pricing remains deterministic. Additional-purchase-cost calculation is a service-level responsibility with no separate function in the latest model. F.2.1, F.2.6, and F.2.8 remain unimplemented. F.2.2's modeled Login Approved prerequisite is visibly simulated; no authentication is performed.
+**Status:** F.2.2 and F.2.3 have browser-interface implementations; F.2.4.1–F.2.4.4 implement request preparation, validation, ownership context, and submission; F.2.4.4 supports deterministic stub mode by default and optional OpenAI recipe generation and unverified store/ZIP price estimates; F.2.5 retries transient OpenAI recipe-generation failures; and F.2.7 displays backend results. No retailer pricing system is integrated. Additional-purchase-cost calculation is a service-level responsibility with no separate function in the latest model. F.2.1, F.2.6, and F.2.8 remain unimplemented. F.2.2's modeled Login Approved prerequisite is visibly simulated; no authentication is performed.
 
 ## Traceability matrix
 
@@ -32,7 +32,7 @@ The API endpoint returns pricing to satisfy the contract. The legacy `estimated_
 
 Request preparation trims surrounding whitespace from ingredient and dietary-restriction strings and converts the positive numeric budget to a float. Values that become empty after trimming are rejected so a whitespace-only string is not treated as a meaningful ingredient or restriction.
 
-F.2.4.3 prepares a case-folded, whitespace-trimmed, deduplicated ownership list before F.2.4.4 submission. Returned recipe ingredient names are matched against that list after pricing. The request JSON shape sent by the browser and the arguments passed to the configured recipe-generation provider remain unchanged.
+F.2.4.3 prepares a case-folded, whitespace-trimmed, deduplicated ownership list before F.2.4.4 submission. Returned recipe ingredient names are matched against that list after pricing. The browser request adds optional `store` and `zip_code` fields; recipe generation still receives only ingredients, budget, and dietary restrictions. The separate OpenAI price-estimation request receives generated ingredient names and store/ZIP context when supplied.
 
 The service-level `calculate_recipe_costs` helper calculates full and additional purchase costs after pricing. XML10 contains no separate F.2.4 cost-calculation function or ICOM flow, so this helper is documented as an unallocated implementation responsibility; no function ID is assigned. No F.2.4.5 appears in XML10. Phase 4's Python tests verify page controls and asset delivery; they do not execute browser JavaScript, so dynamic result rendering is verified separately through browser smoke testing.
 
@@ -68,7 +68,7 @@ F.2.2 has a modeled **Login Approved** input from F.2.1 (`I_CSSY5WGCB8KAK_8SFB4X
 
 ## Phase 5 ingredient-aware pricing and model gap
 
-The approved Phase 5 behavior uses the existing `ingredients` request array as the user's already-owned ingredient list. The service matches normalized exact names, keeps each full estimated price, calculates the full recipe cost and additional purchase cost, and compares only the additional purchase cost with the submitted budget. The browser displays these backend-calculated fields and does not calculate deductions.
+The approved Phase 5 behavior uses the existing `ingredients` request array as the user's already-owned ingredient list. Optional `store` and `zip_code` request fields provide context for OpenAI price estimates; the Flask form requires both, while older API clients may omit both and retain demonstration pricing. The service matches normalized exact names, keeps each full estimated price, calculates the full recipe cost and additional purchase cost, and compares only the additional purchase cost with the submitted budget. The browser displays these backend-calculated fields and does not calculate deductions.
 
 XML10 confirms F.2.4.3 — Specify Already-Owned Recipe Ingredients and F.2.4.4 — Submit Recipe and Pricing Requests, along with their C.2.4.3 and C.2.4.4 component allocations. It contains no F.2.4.5 and no separate cost-calculation function or associated flow. Accordingly, `recipe_service.py::calculate_recipe_costs` remains a service-level helper with no assigned Innoslate function ID. The feature adds no request field: the existing `ingredients` array is interpreted as items already owned. Requirement IDs remain Pending Verification where no direct relationship is available at the function or subfunction level.
 
@@ -87,7 +87,7 @@ XML10 confirms F.2.4.3 — Specify Already-Owned Recipe Ingredients and F.2.4.4 
 | Sys.2.1.2 — Recommendation Reuse | `I_2YMHVNRGN2GM1_86SE86A10JNKK` | No cache or persisted recommendation reuse | Deferred; Pending Implementation |
 | Duplicate API Request Prevention | Requirement/global ID not verified | Browser disables the submit button while a request is in flight; no cross-request idempotency store | Partial only; implementation and requirement identity Pending Verification |
 
-The v1 request shape and successful response schema are unchanged. OpenAI receives only the user's ingredients, budget, and dietary restrictions and returns recipe names and ingredient names. The response is locally validated before it reaches recipe pricing. The model's pricing request is not used to obtain prices: recipe pricing remains a separate deterministic `grocery_store_interface` call, as approved for this phase. This is a documented deviation from XML10's LLM/web-search pricing flow; no grocery scraping or LLM-invented prices are implemented.
+The successful v1 response schema is unchanged; the request accepts optional `store` and `zip_code` fields. OpenAI recipe generation receives the user's ingredients, budget, and dietary restrictions and returns recipe names and ingredient names. In OpenAI mode, when location context is supplied, a separate structured OpenAI request estimates prices for generated ingredient names. These estimates are unverified and are not retrieved from a retailer. Stub mode and legacy API requests without store/ZIP context continue to use deterministic demonstration prices. No grocery scraping or live retailer pricing is implemented.
 
 Live mode requires `OPENAI_API_KEY` on the server. Missing credentials and authorization errors are reported as safe `503` failures; invalid provider data maps to `502`; transient connection, timeout, rate-limit, and server errors are retried with a maximum of ten total attempts (the initial attempt plus at most nine retries). The SDK's automatic retries are disabled so the application owns this bound. This implements F.2.5 for transient provider errors but the XML10 diagram does not show a retry flow back to F.2.4.
 
@@ -96,10 +96,10 @@ XML10 contains a retry-limit inconsistency: STH.1.1.14 describes up to ten retry
 ## Existing deterministic stub limitations
 
 - In the default `stub` mode, `llm_api_interface.send_recipe_requirements(...)` returns the same two hard-coded recipes: Pasta Carbonara and Vegetable Stir-Fry. Optional OpenAI mode generates recipes, but recommendations are not guaranteed to obey dietary restrictions or budget.
-- `llm_api_interface.request_pricing(...)` attaches ingredient prices and calculates a total for each recipe using the grocery-store interface.
+- `llm_api_interface.request_pricing(...)` attaches demonstration prices or OpenAI estimates and calculates a total for each recipe.
 - `grocery_store_interface.get_ingredient_pricing(...)` uses a fixed local price dictionary and returns `$1.00` for an ingredient without a listed price. It does not query a store or reflect location, quantity, taxes, or current prices.
 - The recipe data contains no preparation instructions, serving counts, or image metadata. The current pricing data is limited to ingredient names, estimated prices, and a recipe total.
-- Fixed recipes/prices support an end-to-end demonstration, not production recommendations or live pricing. In OpenAI mode, ingredients, budget, and dietary restrictions are sent to the external provider; grocery estimates remain demonstration data in every mode. User-owned matches only adjust the backend additional-purchase estimate, while budget does not filter recipes and dietary restrictions are not guaranteed.
+- Fixed recipes/prices support an end-to-end demonstration, not production recommendations or live pricing. In OpenAI mode, ingredients, budget, and dietary restrictions are sent for recipe generation; when store and ZIP are supplied, generated ingredient names plus store/ZIP are sent in a separate price-estimation request. User-owned matches only adjust the backend additional-purchase estimate, while budget does not filter recipes and dietary restrictions are not guaranteed.
 
 ## Modeling items requiring confirmation
 
@@ -137,9 +137,10 @@ repository. S.2's database lookup is likewise unimplemented. The current
 `$1.00` fallback for unknown ingredient names is part of the in-memory
 implementation, not a modeled database response.
 
-The experimental LLM pricing module does not replace production pricing or
-recipe generation. Its request/validation timings are proposed measurements
-against the LLM API boundary; they do not establish an S.3 model mapping. The
-current export has a separate non-simulation `Database scenario` entity also
+The OpenAI price estimator is used by the web workflow only in OpenAI mode
+when store and ZIP are supplied. Its request/validation timings remain
+separate benchmark measurements against the LLM API boundary; they do not
+establish an S.3 model mapping. The current export has a separate
+non-simulation `Database scenario` entity also
 numbered S.2 (`I_C2XSPABGH6GRC_A22Z9Z9V1VQGG`); the traceability above uses the
 S.2 `Database` root with the action sequence and participant assets.

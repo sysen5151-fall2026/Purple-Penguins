@@ -86,9 +86,25 @@ components:
           items:
             type: string
             minLength: 1
+        store:
+          type: string
+          enum: ["Walmart", "Sam's Club", "Wegmans", "Kroger", "Weis", "Costco"]
+          description: >-
+            Optional store context for OpenAI price estimates. When supplied,
+            zip_code must also be supplied. This does not select a live retailer
+            pricing integration.
+        zip_code:
+          type: string
+          pattern: '^\d{5}(?:-\d{4})?$'
+          description: >-
+            Optional US ZIP code for OpenAI price estimates. When supplied,
+            store must also be supplied. Estimates are unverified and are not
+            live store prices.
       description: >-
-        Servings are omitted because they are not currently supported by the
-        backend and are not confirmed as an Innoslate requirement.
+        Store and ZIP context are optional for backwards compatibility. The
+        Flask form requires both. Servings are omitted because they are not
+        currently supported by the backend and are not confirmed as an
+        Innoslate requirement.
 
     RecipeGenerationResponse:
       type: object
@@ -149,7 +165,11 @@ components:
         estimated_price:
           type: number
           minimum: 0
-          description: Estimated price in USD from the deterministic grocery-store stub.
+          description: >-
+            Estimated USD amount. Stub mode uses the deterministic local
+            dictionary. OpenAI mode with store and ZIP context uses an
+            approximate, unverified model estimate; no retailer pricing system
+            or live product data is queried.
         owned:
           type: boolean
           description: Whether the ingredient exactly matches a user-owned ingredient after case and whitespace normalization.

@@ -84,16 +84,16 @@ The latest Innoslate decomposition of **C.2.4 Submit Recipe and Pricing Requests
 The route calls `format_and_validate_api_request()`, then `specify_already_owned_recipe_ingredients()`, and finally `submit_recipe_and_pricing_requests()`. The submission function calls `llm_api_interface.send_recipe_requirements(ingredients, budget, dietary_restrictions)`.
 
 - **Stub mode (default):** In-process deterministic recipe records are returned; no external LLM request occurs. These recipes do **not** demonstrate adherence to dietary preferences.
-- **OpenAI mode:** The server-side `openai_adapter.generate_recipes()` sends the submitted ingredients, budget, and restrictions to the OpenAI Responses API over HTTPS. The desired model output is a JSON object containing `recipes`, an array of objects containing only `name` and an `ingredients` string array. Pricing is not produced by the model.
+- **OpenAI mode:** The server-side `openai_adapter.generate_recipes()` sends the submitted ingredients, budget, and restrictions to the OpenAI Responses API over HTTPS. The desired model output is a JSON object containing `recipes`, an array of objects containing only `name` and an `ingredients` string array. When store and ZIP context are supplied, a separate OpenAI Responses request estimates prices for the generated ingredient names. These are not verified retailer prices or live product data.
 - The model adapter validates parsed responses and raises controlled errors on missing access, invalid responses, non-retryable service errors, or exhausted retries. Transient failures use bounded retries of **up to ten total attempts**, with a configurable per-attempt timeout (default 30 seconds).
 
 ### 4.3 Recipe-generation interface → grocery pricing boundary
 
-`llm_api_interface.request_pricing()` collects ingredient names from recipe candidates and calls `grocery_store_interface.get_ingredient_pricing()`.
+`llm_api_interface.request_pricing()` collects ingredient names from recipe candidates. Stub mode calls `grocery_store_interface.get_ingredient_pricing()`; OpenAI mode with store and ZIP context makes a separate OpenAI estimate request.
 
-- **Current data source:** A seven-item price dictionary embedded in code, returning USD values.
-- **Unknown ingredient fallback:** `$1.00` per ingredient name. This is an approximation that can distort live-generated recipe estimates.
-- **No network request is made** to a grocery store; no database or store-selection functionality is implemented.
+- **Stub source:** A seven-item price dictionary embedded in code, returning USD values; unknown names use the `$1.00` fallback.
+- **OpenAI estimate source:** A separate model request uses the selected store and ZIP as context. It returns unverified estimates and does not access retailer systems.
+- **No retailer network request is made**; no database or verified store pricing is implemented.
 - Returned prices are attached to each recipe before `recipe_service.py` calculates the full and additional-purchase costs.
 
 ### 4.4 Computation and return to the user

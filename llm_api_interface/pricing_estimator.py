@@ -1,4 +1,4 @@
-"""Experimental, isolated LLM pricing estimates for Chapter 10.4 benchmarks."""
+"""OpenAI grocery price estimates and Chapter 10.4 benchmark helpers."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from openai import APIStatusError, OpenAI, OpenAIError
 
 from .openai_adapter import DEFAULT_MODEL, MAX_OUTPUT_TOKENS, _read_timeout
 from .errors import RecipeGenerationServiceError
+from pricing_timing import measure_stage
 
 
 _PRICING_SCHEMA = {
@@ -34,11 +35,14 @@ _PRICING_SCHEMA = {
 }
 
 _SYSTEM_INSTRUCTIONS = (
-    "Estimate an unverified US-dollar grocery price for each requested "
-    "ingredient name. Treat each name as one prospective purchase item; no "
-    "quantity or package size is supplied. Return exactly one estimate per "
-    "requested name, with no extra ingredients or commentary. These are "
-    "estimates, not verified store prices."
+    "Estimate an approximate US-dollar price for one ordinary grocery "
+    "purchase item for each requested ingredient name. When a store and ZIP "
+    "code are supplied, use them to tailor the estimate as accurately as "
+    "your knowledge allows. You do not have live access to retailer prices, "
+    "inventory, or product catalogs; do not claim that any estimate is "
+    "current or verified. No recipe quantity or package size is supplied. "
+    "Return exactly one estimate per requested name, with no extra "
+    "ingredients or commentary."
 )
 
 
@@ -88,16 +92,99 @@ def create_pricing_client() -> tuple[OpenAI, str]:
     return client, model
 
 
-def build_pricing_request(ingredients: list[str]) -> list[dict[str, str]]:
+def build_pricing_request(
+    ingredients: list[str],
+    *,
+    store: str | None = None,
+    zip_code: str | None = None,
+) -> list[dict[str, str]]:
     """Validate benchmark inputs and construct the structured request payload."""
     _validate_ingredient_input(ingredients)
+    if (store is None) != (zip_code is None):
+        raise PricingBenchmarkError("incomplete_store_location")
+    if store is not None and (
+        not store.strip()
+        or zip_code is None
+        or not zip_code.strip()
+    ):
+        raise PricingBenchmarkError("invalid_store_location")
+    request_payload: dict[str, object] = {"ingredients": ingredients}
+    if store is not None and zip_code is not None:
+        request_payload["store"] = store
+        request_payload["zip_code"] = zip_code
     return [
         {"role": "system", "content": _SYSTEM_INSTRUCTIONS},
         {
             "role": "user",
-            "content": json.dumps({"ingredients": ingredients}),
+            "content": json.dumps(request_payload),
         },
     ]
+
+
+def estimate_store_prices(
+    ingredients: list[str],
+    *,
+    store: str,
+    zip_code: str,
+) -> dict[str, float]:
+    """Estimate ingredient prices for a selected store and ZIP via OpenAI."""
+    try:
+        with measure_stage("openai_price_estimation"):
+            client, model = create_pricing_client()
+            request_input = build_pricing_request(
+                ingredients,
+                store=store,
+                zip_code=zip_code,
+            )
+            output_text = request_price_estimates(
+                client,
+                model,
+                request_input,
+            )
+            estimates = validate_price_estimates(output_text, ingredients)
+    except PricingBenchmarkError as error:
+        status_code = _service_status_for_pricing_failure(error)
+        provider_status = (
+            f" provider_status={error.provider_status_code}"
+            if error.provider_status_code is not None
+            else ""
+        )
+        raise RecipeGenerationServiceError(
+            "Estimated grocery pricing is temporarily unavailable. "
+            "Please try again.",
+            status_code=status_code,
+            log_message=(
+                f"OpenAI price estimation failed ({error.failure_code})."
+                f"{provider_status}"
+            ),
+        ) from error
+
+    return {
+        estimate["ingredient"]: estimate["estimated_price_usd"]
+        for estimate in estimates
+    }
+
+
+def _service_status_for_pricing_failure(
+    error: PricingBenchmarkError,
+) -> int:
+    if error.failure_code in {
+        "missing_api_key",
+        "empty_openai_model",
+        "invalid_openai_timeout",
+        "openai_client_initialization_error",
+    }:
+        return 503
+    if error.failure_code.startswith("openai_"):
+        return 503
+    if error.provider_status_code in {401, 403, 429}:
+        return 503
+    if (
+        error.provider_status_code is not None
+        and error.provider_status_code >= 500
+    ):
+        return 503
+    return 502
 
 
 def request_price_estimates(
@@ -177,7 +264,10 @@ def validate_price_estimates(
         if isinstance(amount, bool) or not isinstance(amount, (int, float)):
             raise PricingBenchmarkError("invalid_estimated_price")
 
-        price = float(amount)
+        try:
+            price = float(amount)
+        except OverflowError as error:
+            raise PricingBenchmarkError("invalid_estimated_price") from error
         if not math.isfinite(price) or price < 0:
             raise PricingBenchmarkError("invalid_estimated_price")
 
