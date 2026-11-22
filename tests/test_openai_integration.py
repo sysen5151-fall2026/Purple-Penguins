@@ -278,6 +278,7 @@ def test_live_mode_discloses_external_data_use_without_exposing_credentials(
 
     page = client.get("/").data
 
-    assert b"sent from the server to OpenAI" in page
-    assert b"Do not submit sensitive information" in page
+    assert b"sent to OpenAI for recipe generation" in page
+    assert b"selected store and ZIP code are sent" in page
+    assert b"Do not submit other sensitive" in b" ".join(page.split())
     assert b"do-not-render-this-key" not in page

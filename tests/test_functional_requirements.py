@@ -37,6 +37,17 @@ def test_homepage_contains_recipe_preference_controls_and_demo_notices(client):
     assert response.status_code == 200
     assert b'id="recipe-form"' in page
     assert b'id="ingredients"' in page
+    assert b'id="zip-code"' in page
+    assert b'id="store"' in page
+    for store in (
+        b"Walmart",
+        b"Sam&#39;s Club",
+        b"Wegmans",
+        b"Kroger",
+        b"Weis",
+        b"Costco",
+    ):
+        assert store in page
     assert b"Ingredients you already own" in page
     assert b'id="budget"' in page
     assert b'id="dietary-restrictions"' in page
@@ -51,8 +62,9 @@ def test_live_mode_homepage_discloses_external_generation(monkeypatch):
     response = app.create_app({"TESTING": True}).test_client().get("/")
 
     assert response.status_code == 200
-    assert b"sent from the server to OpenAI" in response.data
-    assert b"Grocery prices remain fixed demonstration estimates" in response.data
+    assert b"sent to OpenAI for recipe generation" in response.data
+    assert b"selected store and ZIP code are sent" in response.data
+    assert b"not live or verified store prices" in response.data
 
 
 def test_homepage_loads_recipe_interface_assets(client):
@@ -67,6 +79,8 @@ def test_homepage_loads_recipe_interface_assets(client):
     assert b"recipe.additional_purchase_cost" in js_response.data
     assert b"recipe.within_budget" in js_response.data
     assert b"Full recipe cost" in js_response.data
+    assert b"zip_code: zipCode" in js_response.data
+    assert b"store," in js_response.data
 
 
 def test_homepage_startup_does_not_run_console_workflow(monkeypatch):
@@ -428,6 +442,105 @@ def test_recipe_endpoint_allows_no_dietary_restrictions(client):
     )
 
     assert response.status_code == 200
+
+
+def test_openai_price_estimates_receive_selected_store_and_zip(
+    client,
+    monkeypatch,
+):
+    monkeypatch.setenv("RECIPE_GENERATION_MODE", "openai")
+    monkeypatch.setattr(
+        recipe_service,
+        "send_recipe_requirements",
+        lambda **_kwargs: [
+            {"name": "Pasta Bowl", "ingredients": ["pasta"]}
+        ],
+    )
+    captured = {}
+
+    def fake_estimate(ingredients, *, store, zip_code):
+        captured.update(
+            ingredients=ingredients,
+            store=store,
+            zip_code=zip_code,
+        )
+        return {"pasta": 3.25}
+
+    monkeypatch.setattr(
+        "llm_api_interface.pricing_estimator.estimate_store_prices",
+        fake_estimate,
+    )
+
+    response = client.post(
+        "/api/v1/recipes",
+        json={
+            "ingredients": ["salt"],
+            "budget": 3.0,
+            "dietary_restrictions": [],
+            "store": "Sam's Club",
+            "zip_code": "00501",
+        },
+    )
+
+    recipe = response.get_json()["recipes"][0]
+    assert response.status_code == 200
+    assert captured == {
+        "ingredients": ["pasta"],
+        "store": "Sam's Club",
+        "zip_code": "00501",
+    }
+    assert recipe["estimated_total_cost"] == 3.25
+    assert recipe["additional_purchase_cost"] == 3.25
+    assert recipe["within_budget"] is False
+
+
+def test_openai_estimation_failure_does_not_fall_back_to_demo_prices(
+    client,
+    monkeypatch,
+):
+    from llm_api_interface.errors import RecipeGenerationServiceError
+
+    monkeypatch.setenv("RECIPE_GENERATION_MODE", "openai")
+    monkeypatch.setattr(
+        recipe_service,
+        "send_recipe_requirements",
+        lambda **_kwargs: [
+            {"name": "Pasta Bowl", "ingredients": ["pasta"]}
+        ],
+    )
+
+    def fail_estimate(*_args, **_kwargs):
+        raise RecipeGenerationServiceError(
+            "Estimated grocery pricing is temporarily unavailable.",
+            status_code=503,
+            log_message="controlled estimator failure",
+        )
+
+    monkeypatch.setattr(
+        "llm_api_interface.pricing_estimator.estimate_store_prices",
+        fail_estimate,
+    )
+    monkeypatch.setattr(
+        "llm_api_interface.get_ingredient_pricing",
+        lambda *_args: pytest.fail("Price estimates must not silently fall back."),
+    )
+
+    response = client.post(
+        "/api/v1/recipes",
+        json={
+            "ingredients": ["salt"],
+            "budget": 3.0,
+            "dietary_restrictions": [],
+            "store": "Walmart",
+            "zip_code": "14850",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "backend_failure"
+    assert response.get_json()["error"]["message"] == (
+        "Estimated grocery pricing is temporarily unavailable."
+    )
 
 
 def test_recipe_endpoint_rejects_malformed_json(client):

@@ -52,6 +52,50 @@ def test_C242_02_empty_dietary_restrictions_are_allowed(valid_request):
     assert format_and_validate_api_request(valid_request)["dietary_restrictions"] == []
 
 
+def test_optional_store_and_zip_are_normalized_together(valid_request):
+    valid_request.update(store=" Walmart ", zip_code=" 00501 ")
+
+    result = format_and_validate_api_request(valid_request)
+
+    assert result["store"] == "Walmart"
+    assert result["zip_code"] == "00501"
+
+
+@pytest.mark.parametrize(
+    ("store", "zip_code", "field"),
+    [
+        ("Target", "14850", "store"),
+        ("Walmart", "1485", "zip_code"),
+        ("Walmart", "ABCDE", "zip_code"),
+        ("Walmart", "14850-123", "zip_code"),
+    ],
+)
+def test_store_and_zip_context_is_validated(
+    valid_request,
+    store,
+    zip_code,
+    field,
+):
+    valid_request.update(store=store, zip_code=zip_code)
+
+    assert_invalid(valid_request, field)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"store": "Walmart"},
+        {"zip_code": "14850"},
+    ],
+)
+def test_store_and_zip_must_be_supplied_together(valid_request, payload):
+    valid_request.update(payload)
+
+    errors = assert_invalid(valid_request)
+
+    assert {"store", "zip_code"}.intersection(errors)
+
+
 @pytest.mark.parametrize("payload", [None, [], "not an object", 7, True])
 def test_C242_03_non_object_body_is_rejected(payload):
     assert_invalid(payload, "body")

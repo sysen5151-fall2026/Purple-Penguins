@@ -2,11 +2,13 @@
 
 ## Purpose and scope
 
-This benchmark measures the current Python pricing work and a separate,
-experimental LLM price-estimation request. It excludes recipe generation,
+This benchmark measures the current Python pricing work and a separate LLM
+price-estimation request. The same estimator helper is used by the web
+workflow in OpenAI mode when store and ZIP context are supplied. The benchmark
+excludes recipe generation,
 browser rendering, user input, and the simulated login prerequisite. The
-experimental module is not imported by the normal web request path and never
-replaces the production pricing dictionary.
+benchmark remains a separate, explicitly authorized workflow; it does not
+make normal web requests or use store/ZIP context.
 
 The fixed shared input is the name-only list:
 
@@ -15,10 +17,9 @@ chicken, rice, broccoli, olive oil, garlic
 ```
 
 The production pricing interface accepts ingredient names only; it has no
-quantity or package-size field. The experimental prompt uses the same names
-and asks for an estimate per named prospective item, with no quantity or unit
-supplied. Price accuracy is not evaluated. LLM results are unverified
-estimates, not actual grocery-store prices.
+quantity or package-size field. The shared estimator prompt asks for an estimate per named prospective item,
+with no quantity or unit supplied. Price accuracy is not evaluated. LLM
+results are unverified estimates, not actual grocery-store prices.
 
 Both modes then run the same ownership and recipe-cost functions with all
 benchmark ingredients treated as unowned. The benchmark-only budget is
@@ -46,7 +47,7 @@ emit timing records.
 `llm_pricing_attempt` is measured by the application around the SDK call. It
 includes elapsed time experienced by the client (network transfer, provider
 waiting, and SDK overhead); it does **not** expose or claim access to
-provider-internal execution time. The experimental client has
+provider-internal execution time. The price-estimation client has
 `max_retries=0`, so `retry_attempts` is zero and each run sends no more than
 one API request. Failed attempts are recorded; validation is absent if no
 response arrived.
@@ -61,7 +62,7 @@ Export.xml`; full measurement mapping is also in
 |---|---|---|
 | S.1 Webscraping — `I_293FF5YECAK8A_BDX2FTR813SDP` | Participants: User `I_3RKA1K727YKNZ_95TTAV7FWXJPM`, App `I_B0312FGXERG7B_BWY173TC0M5DY`, Grocery Store Website `I_9TDEK0SCJ8J4T_90DD1GZVR5P1F`. Actions: S.1.1 request prices `I_B6CN15D638J7B_9DJTNN4BBD40S`; S.1.2 request webpage `I_E0YKN30Z5EJTY_97843X9ZFQS26`; S.1.3 receive webpage request `I_5KFGA727G0KB2_9F0RZHFEXBYS1`; S.1.4 receive webpage `I_BNC16EWQB6KKP_AADC99C1P2WMX`; S.1.5 parse webpage `I_FWXSPC1D7JH0Y_AYHAHN893XGJ8`; S.1.6 extract pricing `I_5Q3W7HG65EG35_89219FPNCCBNE`; S.1.7 display recipe/pricing `I_B574M42QW4KK2_ABDCRP983PS6W`; S.1.8 receive recipe/pricing `I_2920TW22R4K1B_AB0GBRC5KKK1D`. | No scraping, webpage requests, parsing, or extraction is implemented. These actions are unmeasured, not assigned fabricated timings. |
 | S.2 Database — `I_F1H8BF80Z8GJC_8FGHTP2SG9K2S` | Participants: User `I_3RKA1K727YKNZ_95TTAV7FWXJPM`, App `I_B0312FGXERG7B_BWY173TC0M5DY`, Database `I_24D51EK49RKVC_BJHJFM0C6EY5P`. Actions: S.2.1 request pricing `I_BCW3NPAY06H7R_94DNF2DG7EGFV`; S.2.2 lookup unbought ingredients `I_D1TWDBN3V4KDD_8STG5Q336F9B4`; S.2.3 display results `I_6BBS9AH3X8HN6_BGQ9K1HZA5Y14`; S.2.4 receive pricing `I_AB8ZE7DJPWJQ9_9Y2J87WH0VDCM`. | `in_memory_lookup` is a local dictionary analog of the lookup *operation*, not a database implementation or database-latency measurement. |
-| S.3 LLM Pricing | No S.3 action sequence, action identifier, or S.3 participant allocation is present in the inspected export. | Experimental benchmark only. Its mapping to an LLM participant is proposed and must not be reported as a verified model trace. |
+| S.3 LLM Pricing | No S.3 action sequence, action identifier, or S.3 participant allocation is present in the inspected export. | The OpenAI estimate path is implemented at the LLM API boundary, but no S.3 model mapping is verified. The benchmark measures the estimator separately; it does not supply simulation values. |
 
 The local Python workflow runs within one process. It cannot represent the
 external boundaries, transfer time, website parsing, database/network

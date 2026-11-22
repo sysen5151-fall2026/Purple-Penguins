@@ -30,7 +30,10 @@ Start the web application in its default deterministic recipe-stub mode:
 python -m app
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in a browser. Grocery prices remain fixed demonstration estimates in both generation modes.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in a browser. The form asks for a US ZIP code and one of Walmart, Sam's Club, Wegmans, Kroger, Weis, or Costco.
+Stub mode uses fixed demonstration prices and does not use the store or ZIP
+selection. OpenAI mode requests unverified price estimates with the selected
+store and ZIP; it does not retrieve live retailer prices.
 
 ### Optional OpenAI recipe generation
 
@@ -43,7 +46,7 @@ $env:OPENAI_MODEL = "gpt-6-luna"
 python -m app
 ```
 
-Keep the key in the process environment; do not put it in source files or browser code. `.env` files are ignored and are not loaded by the application. OpenAI usage can incur charges, including on retries; check current provider pricing. The application does not enforce a cumulative spend limit or cache generated recommendations. Ingredients, budget, and dietary restrictions are sent to OpenAI in live mode. Recipe generation is not guaranteed to enforce dietary restrictions; verify ingredients and allergens yourself. The modeled login prerequisite remains simulated and does not authenticate users.
+Keep the key in the process environment; do not put it in source files or browser code. `.env` files are ignored and are not loaded by the application. OpenAI usage can incur charges: OpenAI mode makes a recipe-generation request and a separate price-estimation request, while generation retries are bounded. The application does not enforce a cumulative spend limit or cache generated recommendations. Ingredients, budget, and dietary restrictions are sent to OpenAI in live mode; the selected store and ZIP code are sent in the separate price-estimation request. Estimates are not verified against current retailer prices, inventory, package sizes, or checkout fees. Recipe generation is not guaranteed to enforce dietary restrictions; verify ingredients and allergens yourself. The modeled login prerequisite remains simulated and does not authenticate users.
 
 Set `$env:RECIPE_GENERATION_MODE = "stub"` to return to the deterministic local recipes.
 
@@ -76,9 +79,10 @@ Run 30 local measurements:
 python -m scripts.benchmark_pricing --mode local --runs 30 --max-requests 30
 ```
 
-LLM pricing is experimental and returns unverified estimates, not store
-prices. It is isolated from Recipe Roulette's production recipe/pricing path.
-Live requests require `--mode llm --live`, an explicit per-invocation cap, and
+The app's OpenAI mode can request unverified, store/ZIP-contextualized price
+estimates; these are not live retailer prices. The separate Chapter 10.4
+benchmark measures the estimator independently. Benchmark live requests
+require `--mode llm --live`, an explicit per-invocation cap, and
 typing the confirmation phrase. The SDK retry count is zero, so a 30-run
 benchmark sends at most 30 API requests. Each request may incur charges.
 

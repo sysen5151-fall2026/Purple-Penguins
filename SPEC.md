@@ -6,9 +6,9 @@
 
 ## 1. Purpose, scope, and system context
 
-Recipe Roulette helps users find recipes from available ingredients while considering dietary preferences and a monetary budget. Its current implementation is a Flask web application with a JSON recipe API, a default deterministic recipe-generation stub, optional hosted OpenAI recipe generation, and a deterministic grocery-price stub. The current build is **not** a production recipe safety, nutritional, or live-pricing service.
+Recipe Roulette helps users find recipes from available ingredients while considering dietary preferences and a monetary budget. Its current implementation is a Flask web application with a JSON recipe API, a default deterministic recipe-generation stub, optional hosted OpenAI recipe generation and unverified price estimates, and a deterministic grocery-price stub. The current build is **not** a production recipe safety, nutritional, or live-pricing service.
 
-**System boundary:** The App accepts user ingredients, budget, and dietary restrictions; it sends a recipe request to a configured generation interface, retrieves ingredient price estimates from its grocery-store interface, calculates estimated full and additional-purchase costs, and displays results. External boundaries represented in the model include the User, LLM API, Grocery Store, and Customer Service; actual live integration currently exists only for the optional hosted recipe model. Account login is simulated. See `docs/context.md`, `docs/traceability.md`, and `docs/route-table.md` for existing project artifacts.
+**System boundary:** The App accepts user ingredients, budget, dietary restrictions, and optional store/ZIP context; it sends recipe and, in OpenAI mode, separate unverified price-estimation requests, calculates estimated full and additional-purchase costs, and displays results. Store/ZIP inputs are required by the Flask form but optional for backward-compatible API clients. No retailer price API is integrated. Account login is simulated. See `docs/context.md`, `docs/traceability.md`, and `docs/route-table.md` for existing project artifacts.
 
 ## 2. Needs and Acceptance Criteria
 
@@ -51,10 +51,11 @@ The identifiers and stakeholder requirement wording below are drawn from the sup
 
 | Source | Boundary and data | Refresh cadence | Unavailable/missing behavior | Status |
 | --- | --- | --- | --- | --- |
-| Browser user input | `ingredients` (`list[str]`), `budget` (`number`, USD), `dietary_restrictions` (`list[str]`) | Every user request | Invalid fields rejected with HTTP 400, no recipe generation initiated | Implemented |
+| Browser user input | `ingredients` (`list[str]`), `budget` (`number`, USD), `dietary_restrictions` (`list[str]`), `store`, and US `zip_code` | Every user request | Invalid fields rejected with HTTP 400, no recipe generation initiated | Implemented |
 | Recipe source — stub | Two fixed recipes, each with a name and ingredient names | Static until code update | Does not reflect submitted preferences; intended for deterministic testing | Implemented default |
 | Recipe source — hosted LLM | OpenAI Responses API returns names and ingredient-name arrays | Per request, only in live mode | Missing key/access → 503; transient errors retried; invalid output → 502 | Optional implementation; live execution not verified here |
-| Grocery pricing | Local `grocery_store_interface` dictionary with seven fixed ingredient prices, USD | Static until code update | Unknown ingredients receive **$1.00**, not an unavailable-data flag. This is a known limitation, not an approved live-data policy. | Stub only; real source not selected/implemented |
+| Grocery pricing — stub | Local `grocery_store_interface` dictionary with seven fixed ingredient prices, USD | Static until code update | Unknown ingredients receive **$1.00**, not an unavailable-data flag. Store and ZIP are not used. | Default demonstration mode |
+| Grocery price estimates — OpenAI | Separate structured OpenAI request with generated ingredient names and optional store/ZIP context | Per request in OpenAI mode when both store and ZIP are supplied | Safe provider failure; no fallback to stub after an estimate request fails | Unverified estimates only; no live retailer prices or package data |
 | Persistent user/recipe data | No database schema or persistent store in current repository | Not applicable | Saved recipes and login cannot be used | Not implemented |
 
 **Outstanding Chapter 8 data-source specification:** Before integrating real grocery prices, approve a provider and document its endpoint/access method, ingredient identifiers, price units and package quantities, currency, location, timestamps, refresh schedule, missing-value behavior, rate limits, timeouts, and degraded-mode behavior. None of these can responsibly be inferred from the present stub.
@@ -68,6 +69,8 @@ Content type: `application/json`. The authoritative full schema is `contracts/ap
 | `ingredients` | array of nonempty strings | Yes | At least one ingredient. Represents ingredients **already owned** by the user; input strings are trimmed. |
 | `budget` | finite number | Yes | Strictly greater than 0, in USD; boolean is not accepted as a number. |
 | `dietary_restrictions` | array of nonempty strings | Yes | May be an empty array to indicate no restrictions; entries are trimmed. |
+| `store` | string enum | No | One of Walmart, Sam's Club, Wegmans, Kroger, Weis, or Costco; must be supplied with `zip_code` to request store-contextualized OpenAI estimates. |
+| `zip_code` | US ZIP string | No | Five digits with optional ZIP+4; must be supplied with `store`. The Flask form requires both fields. |
 
 Unexpected top-level fields are rejected. **Servings are not included** in v1 because that capability is not implemented.
 
@@ -93,7 +96,7 @@ HTTP 200 body: `{ "recipes": [ ... ] }`. Each recipe includes:
 | `additional_purchase_cost` | number, USD | Sum of estimated prices for ingredients not marked `owned` |
 | `within_budget` | boolean | Whether `additional_purchase_cost <= budget` |
 
-Owned matching is case-insensitive exact-name matching after stripping whitespace; aliases, units, package quantities, and amounts already held are **not** considered. Full and purchase costs are aggregated in cents with rounding to the nearest cent. No taxes, store geography, live price timestamps, or nutritional claims are present.
+Owned matching is case-insensitive exact-name matching after stripping whitespace; aliases, units, package quantities, and amounts already held are **not** considered. Full and purchase costs are aggregated in cents with rounding to the nearest cent. OpenAI store/ZIP estimates are approximate and unverified; generated recipes contain ingredient names only, so estimates do not account for recipe quantities, package sizes, taxes, live price timestamps, inventory, or nutritional claims.
 
 Error responses use `{ "error": { "code": "invalid_request" | "backend_failure", "message": "...", "field_errors": { ... }? } }`. Documented HTTP statuses are 400, 500, 502, and 503; see `contracts/api-v1.yaml` for details.
 
@@ -109,7 +112,7 @@ Error responses use `{ "error": { "code": "invalid_request" | "backend_failure",
 
 ### 4.1 Model purpose and inputs
 
-The recipe model produces **recipe names and ingredient names only** from the following inputs: `available_ingredients: list[str]`, `budget_usd: number`, and `dietary_restrictions: list[str]`. It does **not** return prices, instructions, or nutritional information in the current implementation. Pricing remains a separate interface responsibility.
+The recipe model produces **recipe names and ingredient names only** from the following inputs: `available_ingredients: list[str]`, `budget_usd: number`, and `dietary_restrictions: list[str]`. It does **not** return prices, instructions, or nutritional information. In OpenAI mode, a separate structured OpenAI request estimates prices from the generated ingredient names and optional store/ZIP context.
 
 Default mode is `RECIPE_GENERATION_MODE=stub`; optional live mode is `openai`. Environment configuration is described in `README.md`. The model ID is read from `OPENAI_MODEL` (the repository has a configurable default); the server-side credential is `OPENAI_API_KEY` and must never be placed in the browser or committed to the repository.
 

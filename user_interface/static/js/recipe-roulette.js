@@ -5,6 +5,8 @@
   }
 
   const ingredientsInput = document.querySelector("#ingredients");
+  const zipCodeInput = document.querySelector("#zip-code");
+  const storeInput = document.querySelector("#store");
   const budgetInput = document.querySelector("#budget");
   const restrictionsInput = document.querySelector("#dietary-restrictions");
   const generateButton = document.querySelector("#generate-button");
@@ -16,6 +18,7 @@
   const formStatus = document.querySelector("#form-status");
   const resultsSection = document.querySelector(".results");
   const resultsList = document.querySelector("#results-list");
+  const pricingSourceNote = document.querySelector("#pricing-source-note");
   const currency = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -25,6 +28,14 @@
     ingredients: {
       input: ingredientsInput,
       error: document.querySelector("#ingredients-error"),
+    },
+    zip_code: {
+      input: zipCodeInput,
+      error: document.querySelector("#zip-code-error"),
+    },
+    store: {
+      input: storeInput,
+      error: document.querySelector("#store-error"),
     },
     budget: {
       input: budgetInput,
@@ -180,12 +191,14 @@
   }
 
   Object.entries(fields).forEach(([name, { input }]) => {
-    input.addEventListener("input", () => {
+    const clearFieldError = () => {
       input.setAttribute("aria-invalid", "false");
       fields[name].error.textContent = "";
       formStatus.textContent = "";
       formStatus.dataset.state = "";
-    });
+    };
+    input.addEventListener("input", clearFieldError);
+    input.addEventListener("change", clearFieldError);
   });
 
   form.addEventListener("submit", async (event) => {
@@ -196,12 +209,25 @@
     clearErrors();
 
     const ingredients = splitValues(ingredientsInput.value);
+    const zipCode = zipCodeInput.value.trim();
+    const store = storeInput.value;
     const budget = Number(budgetInput.value);
     const dietaryRestrictions = splitValues(restrictionsInput.value);
     let hasValidationError = false;
 
     if (ingredients.length === 0) {
       setFieldError("ingredients", "Enter at least one ingredient.");
+      hasValidationError = true;
+    }
+    if (!/^\d{5}(?:-\d{4})?$/.test(zipCode)) {
+      setFieldError(
+        "zip_code",
+        "Enter a five-digit ZIP code, with an optional four-digit extension.",
+      );
+      hasValidationError = true;
+    }
+    if (!store) {
+      setFieldError("store", "Select a store for the price estimate.");
       hasValidationError = true;
     }
     if (!Number.isFinite(budget) || budget <= 0) {
@@ -218,7 +244,14 @@
     generateButton.disabled = true;
     resultsSection.setAttribute("aria-busy", "true");
     buttonLabel.textContent = "Spinning...";
-    formStatus.textContent = `Requesting ${recipeSource} recipes...`;
+    const usesOpenAiPricing =
+      form.dataset.generationMode === "openai";
+    formStatus.textContent = usesOpenAiPricing
+      ? "Requesting OpenAI recipes and estimated prices..."
+      : "Requesting demonstration recipes and prices...";
+    pricingSourceNote.textContent = usesOpenAiPricing
+      ? `OpenAI estimate for ${store} · ZIP ${zipCode} (not live store prices)`
+      : "Demonstration pricing (store and ZIP not used in stub mode)";
     formStatus.dataset.state = "";
 
     try {
@@ -230,6 +263,8 @@
         },
         body: JSON.stringify({
           ingredients,
+          zip_code: zipCode,
+          store,
           budget,
           dietary_restrictions: dietaryRestrictions,
         }),
