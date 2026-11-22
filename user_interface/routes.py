@@ -1,14 +1,24 @@
 """Flask routes for the F.2 web application and recipe API."""
 
+from collections.abc import Callable
+
 from flask import Blueprint, current_app, jsonify, render_template, request
 
+from grocery_store_interface import (
+    GroceryPricingError,
+    get_grocery_pricing_mode,
+)
 from llm_api_interface import get_recipe_generation_mode
 from llm_api_interface.errors import RecipeGenerationServiceError
 from recipe_service import (
+    RecipeGenerationResponse,
+    RecipeGenerationResponseV2,
     RecipeRequestValidationError,
+    RecipeRequestWithOwnership,
     format_and_validate_api_request,
     specify_already_owned_recipe_ingredients,
     submit_recipe_and_pricing_requests,
+    submit_recipe_and_pricing_requests_v2,
 )
 
 web = Blueprint("web", __name__, template_folder="templates")
@@ -20,12 +30,28 @@ def home():
     return render_template(
         "index.html",
         recipe_generation_mode=get_recipe_generation_mode(),
+        grocery_pricing_mode=get_grocery_pricing_mode(),
     )
 
 
 @web.post("/api/v1/recipes")
 def generate_recipes():
     """F.2.4.4: return recipe results from the configured generation mode."""
+    return _handle_recipe_submission(submit_recipe_and_pricing_requests)
+
+
+@web.post("/api/v2/recipes")
+def generate_recipes_v2():
+    """Return v1 ingredient-use costs plus package-purchase estimates."""
+    return _handle_recipe_submission(submit_recipe_and_pricing_requests_v2)
+
+
+def _handle_recipe_submission(
+    submit: Callable[
+        [RecipeRequestWithOwnership],
+        RecipeGenerationResponse | RecipeGenerationResponseV2,
+    ],
+):
     payload = request.get_json(silent=True)
     try:
         recipe_request = format_and_validate_api_request(payload)
@@ -47,7 +73,22 @@ def generate_recipes():
         recipe_request
     )
     try:
-        response = submit_recipe_and_pricing_requests(request_with_ownership)
+        response = submit(request_with_ownership)
+    except GroceryPricingError as error:
+        current_app.logger.warning(
+            "Grocery pricing failure: %s", error.log_message
+        )
+        return (
+            jsonify(
+                {
+                    "error": {
+                        "code": "backend_failure",
+                        "message": error.public_message,
+                    }
+                }
+            ),
+            error.status_code,
+        )
     except RecipeGenerationServiceError as error:
         current_app.logger.warning(
             "Recipe-generation provider failure: %s", error.log_message

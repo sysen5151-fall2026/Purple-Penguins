@@ -133,6 +133,10 @@
         const price = document.createElement("span");
         price.className = "ingredient-price";
         price.textContent = currency.format(ingredient.estimated_price);
+        price.setAttribute(
+          "aria-label",
+          `Ingredient-use estimate ${currency.format(ingredient.estimated_price)}`
+        );
 
         const ownership = document.createElement("span");
         ownership.className = `ingredient-ownership ${
@@ -140,7 +144,27 @@
         }`;
         ownership.textContent = ingredient.owned ? "Owned" : "Buy";
 
-        row.append(name, price, ownership);
+        const packageDetails = document.createElement("span");
+        packageDetails.className = "ingredient-package-info";
+        const packagePurchase = ingredient.package_purchase;
+        if (packagePurchase.status === "available") {
+          packageDetails.textContent =
+            `${packagePurchase.packages_required} × ` +
+            `${packagePurchase.package_quantity} ${packagePurchase.package_unit} ` +
+            `${packagePurchase.selected_product} at ` +
+            `${currency.format(packagePurchase.package_price)} each; ` +
+            `${currency.format(packagePurchase.purchase_cost)} package cost`;
+        } else if (packagePurchase.status === "not_required") {
+          packageDetails.textContent = packagePurchase.selected_product
+            ? `Owned; matched ${packagePurchase.selected_product} ` +
+              `(${packagePurchase.package_quantity} ${packagePurchase.package_unit} ` +
+              `at ${currency.format(packagePurchase.package_price)} per package).`
+            : "Owned; no package purchase required.";
+        } else {
+          packageDetails.textContent = "Package purchase estimate unavailable.";
+        }
+
+        row.append(name, price, ownership, packageDetails);
         ingredientList.append(row);
       });
 
@@ -150,30 +174,65 @@
       const fullCost = document.createElement("p");
       fullCost.className = "recipe-total";
       const fullCostLabel = document.createElement("span");
-      fullCostLabel.textContent = "Full recipe cost";
+      fullCostLabel.textContent = "Full recipe ingredient-use cost";
       const fullCostPrice = document.createElement("span");
       fullCostPrice.textContent = currency.format(recipe.estimated_total_cost);
       fullCost.append(fullCostLabel, fullCostPrice);
 
-      const purchaseCost = document.createElement("p");
-      purchaseCost.className = "recipe-total";
-      const purchaseCostLabel = document.createElement("span");
-      purchaseCostLabel.textContent = "Additional purchase cost";
-      const purchaseCostPrice = document.createElement("span");
-      purchaseCostPrice.textContent = currency.format(
+      const ingredientUseCost = document.createElement("p");
+      ingredientUseCost.className = "recipe-total";
+      const ingredientUseCostLabel = document.createElement("span");
+      ingredientUseCostLabel.textContent = "Additional ingredient-use cost";
+      const ingredientUseCostPrice = document.createElement("span");
+      ingredientUseCostPrice.textContent = currency.format(
         recipe.additional_purchase_cost
       );
-      purchaseCost.append(purchaseCostLabel, purchaseCostPrice);
+      ingredientUseCost.append(
+        ingredientUseCostLabel,
+        ingredientUseCostPrice
+      );
 
       const budgetStatus = document.createElement("p");
       budgetStatus.className = `budget-status ${
         recipe.within_budget ? "within-budget" : "over-budget"
       }`;
       budgetStatus.textContent = recipe.within_budget
-        ? "Within your budget"
-        : "Over your budget";
+        ? "Within ingredient-use budget"
+        : "Over ingredient-use budget";
 
-      costSummary.append(fullCost, purchaseCost, budgetStatus);
+      const packageCost = document.createElement("p");
+      packageCost.className = "recipe-total";
+      const packageCostLabel = document.createElement("span");
+      packageCostLabel.textContent = "Additional package purchase cost";
+      const packageCostValue = document.createElement("span");
+      packageCostValue.textContent =
+        recipe.package_purchase_status === "available"
+          ? currency.format(recipe.additional_package_purchase_cost)
+          : "Unavailable";
+      packageCost.append(packageCostLabel, packageCostValue);
+
+      const packageBudgetStatus = document.createElement("p");
+      packageBudgetStatus.className = `budget-status ${
+        recipe.within_package_budget === null
+          ? ""
+          : recipe.within_package_budget
+            ? "within-budget"
+            : "over-budget"
+      }`;
+      packageBudgetStatus.textContent =
+        recipe.within_package_budget === null
+          ? "Package-purchase budget status unavailable"
+          : recipe.within_package_budget
+            ? "Within package-purchase budget"
+            : "Over package-purchase budget";
+
+      costSummary.append(
+        fullCost,
+        ingredientUseCost,
+        budgetStatus,
+        packageCost,
+        packageBudgetStatus
+      );
       card.append(title, ingredientsHeading, ingredientList, costSummary);
       resultsList.append(card);
     });
@@ -222,7 +281,7 @@
     formStatus.dataset.state = "";
 
     try {
-      const response = await fetch("/api/v1/recipes", {
+      const response = await fetch("/api/v2/recipes", {
         method: "POST",
         headers: {
           Accept: "application/json",

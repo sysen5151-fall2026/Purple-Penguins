@@ -1,0 +1,7 @@
+scenario,mode,input_dataset_id,stage,status,run_count,sample_count,minimum_duration_s,maximum_duration_s,mean_duration_s,median_duration_s,sample_standard_deviation_s
+actual_in_memory_dictionary,local,chapter11-five-ingredient-requirements-v1,in_memory_lookup,success,30,30,2e-06,4.4e-06,2.3566666666666664e-06,2.2e-06,5.500365714068997e-07
+actual_in_memory_dictionary,local,chapter11-five-ingredient-requirements-v1,ingredient_ownership_matching,success,30,30,1.2e-06,2.5e-06,1.4e-06,1.3e-06,2.505167074062231e-07
+actual_in_memory_dictionary,local,chapter11-five-ingredient-requirements-v1,pricing_request_processing,success,30,30,2.4e-06,8.2e-06,2.9166666666666666e-06,2.6e-06,1.0657952618725065e-06
+actual_in_memory_dictionary,local,chapter11-five-ingredient-requirements-v1,pricing_response_processing,success,30,30,2.6e-06,5.3e-06,2.96e-06,2.85e-06,5.03504956658135e-07
+actual_in_memory_dictionary,local,chapter11-five-ingredient-requirements-v1,pricing_workflow_total,success,30,30,3.66e-05,0.0001039,4.357e-05,4.01e-05,1.2505230629758426e-05
+actual_in_memory_dictionary,local,chapter11-five-ingredient-requirements-v1,recipe_cost_calculation,success,30,30,9.4e-06,3.91e-05,1.206e-05,1.015e-05,6.194413500944997e-06

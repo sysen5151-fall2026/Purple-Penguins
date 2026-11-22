@@ -46,13 +46,47 @@ def test_homepage_contains_recipe_preference_controls_and_demo_notices(client):
     assert b"Verify ingredients and allergens yourself" in page
 
 
-def test_live_mode_homepage_discloses_external_generation(monkeypatch):
+def test_live_recipe_mode_discloses_external_generation_and_disabled_scraping(
+    monkeypatch,
+):
     monkeypatch.setenv("RECIPE_GENERATION_MODE", "openai")
+    monkeypatch.setenv("GROCERY_PRICING_MODE", "html_live")
     response = app.create_app({"TESTING": True}).test_client().get("/")
 
     assert response.status_code == 200
     assert b"sent from the server to OpenAI" in response.data
-    assert b"Grocery prices remain fixed demonstration estimates" in response.data
+    assert b"Live webpage pricing unavailable" in response.data
+    assert b"scraping is disabled" in response.data
+
+
+def test_default_pricing_homepage_identifies_coursework_html_fixtures(
+    monkeypatch,
+):
+    monkeypatch.delenv("GROCERY_PRICING_MODE", raising=False)
+    response = app.create_app({"TESTING": True}).test_client().get("/")
+
+    assert response.status_code == 200
+    assert b"Coursework HTML fixture pricing" in response.data
+    assert b"not live grocery prices" in response.data
+    assert b"no grocery website is contacted" in response.data
+
+
+def test_kroger_mode_homepage_discloses_live_api_not_web_scraping(monkeypatch):
+    monkeypatch.setenv("GROCERY_PRICING_MODE", "kroger")
+    response = app.create_app({"TESTING": True}).test_client().get("/")
+
+    assert response.status_code == 200
+    assert b"Live Kroger API pricing" in response.data
+    assert b"not webpage scraping" in response.data
+    assert b"configured location" in response.data
+
+
+def test_stub_pricing_homepage_identifies_demo_prices(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"Demonstration pricing" in response.data
+    assert b"not current store prices" in response.data
 
 
 def test_homepage_loads_recipe_interface_assets(client):
@@ -62,11 +96,13 @@ def test_homepage_loads_recipe_interface_assets(client):
     assert css_response.status_code == 200
     assert b"@media" in css_response.data
     assert js_response.status_code == 200
-    assert b'fetch("/api/v1/recipes"' in js_response.data
+    assert b'fetch("/api/v2/recipes"' in js_response.data
     assert b"ingredient.owned" in js_response.data
     assert b"recipe.additional_purchase_cost" in js_response.data
     assert b"recipe.within_budget" in js_response.data
-    assert b"Full recipe cost" in js_response.data
+    assert b"recipe.additional_package_purchase_cost" in js_response.data
+    assert b"recipe.within_package_budget" in js_response.data
+    assert b"Full recipe ingredient-use cost" in js_response.data
 
 
 def test_homepage_startup_does_not_run_console_workflow(monkeypatch):
@@ -166,6 +202,86 @@ def test_f243_specifies_normalized_deduplicated_owned_ingredients():
         "owned_ingredient_names": ["eggs", "pasta"],
     }
     assert recipe_request["ingredients"] == [" Eggs ", "eggs", "Pasta"]
+
+
+def test_ownership_matches_exact_names_and_compatible_dry_pasta_forms():
+    result = recipe_service.identify_owned_recipe_ingredients(
+        [" EGGS ", "dry angel hair pasta", "spaghetti"],
+        ["eggs", "pasta"],
+    )
+
+    assert result == [True, True, True]
+
+
+@pytest.mark.parametrize(
+    ("recipe_ingredient", "owned_ingredient"),
+    [
+        ("canned tomatoes", "fresh tomatoes"),
+        ("fresh tomatoes", "canned tomatoes"),
+        ("unsalted butter", "salted butter"),
+        ("salted butter", "unsalted butter"),
+        ("whole milk", "2% milk"),
+        ("2% milk", "whole milk"),
+        ("canned diced tomatoes", "tomatoes"),
+        ("unsalted butter", "butter"),
+        ("whole milk", "milk"),
+        ("fresh angel hair pasta", "pasta"),
+    ],
+)
+def test_ownership_does_not_assume_incompatible_or_unspecified_forms(
+    recipe_ingredient,
+    owned_ingredient,
+):
+    assert recipe_service.identify_owned_recipe_ingredients(
+        [recipe_ingredient],
+        [owned_ingredient],
+    ) == [False]
+
+
+def test_compatible_ownership_preserves_v1_and_v2_cost_calculations(
+    monkeypatch,
+    client,
+):
+    monkeypatch.setenv("GROCERY_PRICING_MODE", "stub")
+    monkeypatch.setattr(
+        recipe_service,
+        "send_recipe_requirements",
+        lambda **_kwargs: [
+            {
+                "name": "Angel Hair",
+                "ingredients": [
+                    {
+                        "name": "dry angel hair pasta",
+                        "quantity": 8.0,
+                        "unit": "oz",
+                    }
+                ],
+            }
+        ],
+    )
+    request = {
+        "ingredients": ["pasta"],
+        "budget": 5.0,
+        "dietary_restrictions": [],
+    }
+
+    v1 = client.post("/api/v1/recipes", json=request)
+    v2 = client.post("/api/v2/recipes", json=request)
+
+    v1_recipe = v1.get_json()["recipes"][0]
+    v2_recipe = v2.get_json()["recipes"][0]
+    assert v1_recipe["estimated_total_cost"] == 1.0
+    assert v1_recipe["additional_purchase_cost"] == 0.0
+    assert v1_recipe["ingredients"][0]["owned"] is True
+    assert v2_recipe["estimated_total_cost"] == 1.0
+    assert v2_recipe["additional_purchase_cost"] == 0.0
+    assert v2_recipe["additional_package_purchase_cost"] == 0.0
+    assert v2_recipe["ingredients"][0]["package_purchase"]["status"] == (
+        "not_required"
+    )
+    assert v2_recipe["ingredients"][0]["package_purchase"]["purchase_cost"] == (
+        0.0
+    )
 
 
 def test_f243_ownership_context_is_passed_to_submission(client, monkeypatch):

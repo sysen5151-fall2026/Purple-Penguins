@@ -33,6 +33,7 @@ class PricingMeasurement:
     stage_timings: list[StageTiming] = field(default_factory=list)
     attempt_count: int = 0
     retry_attempts: int = 0
+    provider_request_count: int = 0
     run_status: str = "running"
     failure_type: str = ""
     provider_status_code: int | None = None
@@ -101,6 +102,28 @@ _ACTIVE_MEASUREMENT: ContextVar[PricingMeasurement | None] = ContextVar(
     "active_pricing_measurement",
     default=None,
 )
+_ACTIVE_REQUEST_BUDGET: ContextVar[ExternalRequestBudget | None] = ContextVar(
+    "active_external_request_budget",
+    default=None,
+)
+
+
+@dataclass
+class ExternalRequestBudget:
+    max_requests: int
+    request_count: int = 0
+
+    def consume(self) -> None:
+        if self.request_count >= self.max_requests:
+            raise ExternalRequestBudgetExceeded()
+        self.request_count += 1
+
+
+class ExternalRequestBudgetExceeded(RuntimeError):
+    failure_code = "external_request_budget_exceeded"
+
+    def __init__(self) -> None:
+        super().__init__(self.failure_code)
 
 
 @contextmanager
@@ -112,6 +135,27 @@ def activate_measurement(
         yield measurement
     finally:
         _ACTIVE_MEASUREMENT.reset(token)
+
+
+@contextmanager
+def activate_request_budget(
+    budget: ExternalRequestBudget,
+) -> Iterator[ExternalRequestBudget]:
+    token = _ACTIVE_REQUEST_BUDGET.set(budget)
+    try:
+        yield budget
+    finally:
+        _ACTIVE_REQUEST_BUDGET.reset(token)
+
+
+def record_external_request() -> None:
+    budget = _ACTIVE_REQUEST_BUDGET.get()
+    if budget is not None:
+        budget.consume()
+
+    measurement = _ACTIVE_MEASUREMENT.get()
+    if measurement is not None:
+        measurement.provider_request_count += 1
 
 
 def measure_stage(stage: str):

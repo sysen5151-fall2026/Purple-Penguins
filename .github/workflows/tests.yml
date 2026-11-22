@@ -22,4 +22,5 @@ jobs:
       - name: Run tests
         env:
           RECIPE_GENERATION_MODE: stub
+          GROCERY_PRICING_MODE: stub
         run: python -m pytest

@@ -407,6 +407,7 @@ body {
 
 .ingredient-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   color: #385b57;
@@ -442,6 +443,14 @@ body {
 .ingredient-ownership.to-purchase {
   background: #fff0e8;
   color: #985028;
+}
+
+.ingredient-package-info {
+  flex: 1 0 100%;
+  margin-left: auto;
+  color: #6a807d;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
 }
 
 .recipe-cost-summary {

@@ -1,0 +1,8 @@
+scenario_id,architecture,record_type,source,input_dataset_id,run_count,minimum_duration_s,maximum_duration_s,mean_duration_s,median_duration_s,sample_standard_deviation_s,reference_scenario_id,reference_mean_duration_s,mean_delta_s,mean_delta_percent,comparability_note
+S.1,Webscraping,innoslate_simulation,Team-provided Innoslate simulation summary,,10,4.05,30.96,17.185,,,,,,,completed
+S.2,Database,innoslate_simulation,Team-provided Innoslate simulation summary,,10,2.67,17.94,6.86,,,,,,,completed
+S.3,LLM pricing,innoslate_simulation,Innoslate simulation,,,,,,,,,,,,pending
+ACTUAL-HTML-FIXTURE,Local coursework HTML fixture,measured_application,Recipe Roulette benchmark CSV,chapter11-five-ingredient-requirements-v1,30,0.0029304,0.0046107,0.0034846,0.00326345,0.0005032488217092257,,,,,"Saved local fixture parsing only; excludes retailer HTTP latency and live product data, so it is not comparable to S.1 simulation."
+ACTUAL-LEGACY-KROGER,Historical Kroger API integration (superseded),measured_application,Recipe Roulette benchmark CSV,,,,,,,,,,,,Legacy records from the superseded Kroger implementation only; not a current pricing mode or live S.1 scraping measurement.
+ACTUAL-LOCAL,In-memory dictionary,measured_application,Recipe Roulette benchmark CSV,,,,,,,,S.2,6.86,,,Not a database query; compare with S.2 only as a limited local lookup proxy.
+ACTUAL-LLM,Experimental LLM price estimates,measured_application,Recipe Roulette benchmark CSV,,,,,,,,S.3,,,,Experimental unverified estimates; S.3 is not present in the current Innoslate export.

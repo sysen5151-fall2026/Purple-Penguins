@@ -1,0 +1,12 @@
+scenario,mode,input_dataset_id,stage,status,run_count,sample_count,minimum_duration_s,maximum_duration_s,mean_duration_s,median_duration_s,sample_standard_deviation_s
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,fixture_page_retrieval,success,30,150,9.76e-05,0.0002496,0.00011583533333333334,0.0001084,1.9628968240420717e-05
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,html_parsing,success,30,150,0.0003565,0.0008511,0.0004303306666666667,0.0003858,9.489599743093295e-05
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,ingredient_ownership_matching,success,30,30,1.6e-06,4.3e-06,2.1e-06,1.9e-06,5.483517622588751e-07
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,price_extraction,success,30,150,1.8e-06,5.7e-06,2.3079999999999998e-06,2.1e-06,4.840433726198316e-07
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,pricing_request_preparation,success,30,30,3.2e-06,8.1e-06,4.1033333333333336e-06,3.7e-06,1.0665714756375582e-06
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,pricing_response_processing,success,30,30,4.5e-06,1.65e-05,5.726666666666666e-06,4.9e-06,2.203278643660215e-06
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,pricing_workflow_total,success,30,30,0.0029304,0.0046107,0.0034846,0.00326345,0.0005032488217092257
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,product_extraction,success,30,150,3.56e-05,0.0007599,4.716266666666667e-05,3.74e-05,5.9418355858904335e-05
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,product_matching,success,30,150,2.59e-05,0.0001333,3.2731333333333336e-05,2.93e-05,1.1382915118701034e-05
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,recipe_cost_calculation,success,30,30,1.16e-05,2.61e-05,1.5146666666666667e-05,1.3e-05,3.926016963208679e-06
+actual_html_fixture_pricing,html_fixture,chapter11-five-ingredient-requirements-v1,unit_package_normalization,success,30,450,9e-07,0.0001055,3.344888888888889e-06,2.75e-06,5.195302239053097e-06

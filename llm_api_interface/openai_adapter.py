@@ -14,6 +14,8 @@ from openai import (
     RateLimitError,
 )
 
+from grocery_store_interface.units import SUPPORTED_RECIPE_UNITS
+
 from .errors import RecipeGenerationServiceError
 
 MAX_TOTAL_ATTEMPTS = 10
@@ -21,6 +23,7 @@ DEFAULT_MODEL = "gpt-6-luna"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 120.0
 MAX_OUTPUT_TOKENS = 2048
+MAX_RECIPE_OUTPUT_TOKENS = 4096
 MAX_RECIPES = 5
 MAX_INGREDIENTS_PER_RECIPE = 40
 
@@ -35,7 +38,19 @@ _RECIPE_SCHEMA = {
                     "name": {"type": "string"},
                     "ingredients": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "quantity": {"type": "number"},
+                                "unit": {
+                                    "type": "string",
+                                    "enum": list(SUPPORTED_RECIPE_UNITS),
+                                },
+                            },
+                            "required": ["name", "quantity", "unit"],
+                            "additionalProperties": False,
+                        },
                     },
                 },
                 "required": ["name", "ingredients"],
@@ -51,17 +66,32 @@ _SYSTEM_INSTRUCTIONS = (
     "Generate practical recipe ideas using the user's preferences. "
     "Take dietary restrictions seriously, but do not claim medical or "
     "allergen safety. Treat the budget as a preference for additional "
-    "purchases. Return recipe names and ingredient names only. Do not return "
-    "prices, totals, instructions, or other fields."
+    "purchases. Return recipe names and ingredient quantities/units for one "
+    "complete recipe batch. When a recipe requires a particular ingredient "
+    "variety or form, include only the necessary descriptor in its ingredient "
+    "name (for example, unsalted butter, dry angel hair pasta, canned diced "
+    "tomatoes, or whole milk). Do not add unnecessary specificity when the "
+    "recipe does not require it. Do not invent or add brand names or retailer-"
+    "specific products; include a brand only if the user explicitly requested "
+    "it. Use weight units for solids, volume units for liquids, and "
+    "count/head/bulb for individually measured items when appropriate. Use "
+    "only the supported unit enum. Do not return prices, totals, instructions, "
+    "or other fields."
 )
 _SERVICE_UNAVAILABLE_MESSAGE = (
     "Recipe generation is temporarily unavailable. Please try again."
 )
 
 
+class GeneratedIngredient(TypedDict):
+    name: str
+    quantity: float
+    unit: str
+
+
 class GeneratedRecipe(TypedDict):
     name: str
-    ingredients: list[str]
+    ingredients: list[GeneratedIngredient]
 
 
 def generate_recipes(
@@ -113,7 +143,7 @@ def generate_recipes(
             response = client.responses.create(
                 model=model,
                 input=request_input,
-                max_output_tokens=MAX_OUTPUT_TOKENS,
+                max_output_tokens=MAX_RECIPE_OUTPUT_TOKENS,
                 text={
                     "format": {
                         "type": "json_schema",
@@ -257,19 +287,59 @@ def _parse_response(output_text: object) -> list[GeneratedRecipe]:
             not isinstance(recipe_ingredients, list)
             or not recipe_ingredients
             or len(recipe_ingredients) > MAX_INGREDIENTS_PER_RECIPE
-            or any(
-                not isinstance(ingredient, str) or not ingredient.strip()
-                for ingredient in recipe_ingredients
-            )
         ):
             raise _invalid_response("A recipe ingredient list is invalid.")
+
+        validated_ingredients: list[GeneratedIngredient] = []
+        seen_ingredients: set[str] = set()
+        for ingredient in recipe_ingredients:
+            if (
+                not isinstance(ingredient, dict)
+                or set(ingredient) != {"name", "quantity", "unit"}
+            ):
+                raise _invalid_response(
+                    "A recipe ingredient has an invalid object shape."
+                )
+
+            ingredient_name = ingredient["name"]
+            quantity = ingredient["quantity"]
+            unit = ingredient["unit"]
+            if (
+                not isinstance(ingredient_name, str)
+                or not ingredient_name.strip()
+            ):
+                raise _invalid_response("A recipe ingredient name is invalid.")
+            if isinstance(quantity, bool) or not isinstance(
+                quantity, (int, float)
+            ):
+                raise _invalid_response("A recipe ingredient quantity is invalid.")
+            try:
+                normalized_quantity = float(quantity)
+            except OverflowError as error:
+                raise _invalid_response(
+                    "A recipe ingredient quantity is invalid."
+                ) from error
+            if not math.isfinite(normalized_quantity) or normalized_quantity <= 0:
+                raise _invalid_response("A recipe ingredient quantity is invalid.")
+            if not isinstance(unit, str) or unit not in SUPPORTED_RECIPE_UNITS:
+                raise _invalid_response("A recipe ingredient unit is invalid.")
+
+            normalized_name = ingredient_name.strip().casefold()
+            if normalized_name in seen_ingredients:
+                raise _invalid_response("A recipe contains a duplicate ingredient.")
+            seen_ingredients.add(normalized_name)
+            validated_ingredients.append(
+                {
+                    "name": ingredient_name.strip(),
+                    "quantity": normalized_quantity,
+                    "unit": unit,
+                }
+            )
 
         validated_recipes.append(
             {
                 "name": name.strip(),
-                "ingredients": [
-                    ingredient.strip() for ingredient in recipe_ingredients
-                ],
+                "ingredients": validated_ingredients,
             }
         )
     return validated_recipes

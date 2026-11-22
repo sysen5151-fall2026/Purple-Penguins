@@ -36,7 +36,27 @@
             <strong>Configuration issue:</strong> Recipe generation mode is not
             configured correctly.
           {% endif %}
-          Grocery prices remain fixed demonstration estimates in every mode.
+          {% if grocery_pricing_mode == "kroger" %}
+            <strong>Live Kroger API pricing:</strong> Recipe ingredient names
+            are sent from the server to the Kroger Products API for the
+            configured location. This is a retailer API, not webpage scraping;
+            listed prices and availability may change.
+          {% elif grocery_pricing_mode == "html_fixture" %}
+            <strong>Coursework HTML fixture pricing:</strong> Product listings
+            are read from saved local HTML pages and parsed by the application.
+            Fixture prices are illustrative test data, not live grocery prices;
+            no grocery website is contacted.
+          {% elif grocery_pricing_mode == "stub" %}
+            <strong>Demonstration pricing:</strong> Prices come from the fixed
+            local dictionary and are not current store prices.
+          {% elif grocery_pricing_mode == "html_live" %}
+            <strong>Live webpage pricing unavailable:</strong> External
+            scraping is disabled until an authorized source is approved and
+            configured.
+          {% else %}
+            <strong>Configuration issue:</strong> Grocery pricing mode is not
+            configured correctly.
+          {% endif %}
           Owned ingredients adjust the additional-purchase estimate; results
           are not filtered by budget. Dietary restrictions may not be enforced,
           and allergen safety is not guaranteed. Verify ingredients and allergens yourself.
@@ -141,10 +161,16 @@
               <h2 id="results-title">Your recipe results</h2>
             </div>
             <span class="results-note">
-              {% if recipe_generation_mode == "openai" %}
-                OpenAI-generated recipes
-              {% else %}
+              {% if grocery_pricing_mode == "kroger" %}
+                Live Kroger API estimate
+              {% elif grocery_pricing_mode == "html_fixture" %}
+                HTML fixture estimates (not live)
+              {% elif grocery_pricing_mode == "stub" %}
                 Demonstration pricing
+              {% elif grocery_pricing_mode == "html_live" %}
+                Live pricing disabled
+              {% else %}
+                Pricing unavailable
               {% endif %}
             </span>
           </div>
@@ -152,7 +178,7 @@
             <div class="empty-state" id="empty-state">
               <span class="empty-icon" aria-hidden="true">✦</span>
               <h3>Ready when you are</h3>
-              <p>Add your preferences and spin to see recipe ideas with estimated demonstration pricing.</p>
+              <p>Add your preferences and spin to see recipe ideas with estimated ingredient pricing.</p>
             </div>
           </div>
         </section>

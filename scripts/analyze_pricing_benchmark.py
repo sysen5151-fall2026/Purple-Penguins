@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import statistics
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -16,9 +17,11 @@ DEFAULT_REFERENCE = (
 SUMMARY_FIELDS = [
     "scenario",
     "mode",
+    "input_dataset_id",
     "stage",
     "status",
     "run_count",
+    "sample_count",
     "minimum_duration_s",
     "maximum_duration_s",
     "mean_duration_s",
@@ -30,6 +33,7 @@ COMPARISON_FIELDS = [
     "architecture",
     "record_type",
     "source",
+    "input_dataset_id",
     "run_count",
     "minimum_duration_s",
     "maximum_duration_s",
@@ -43,6 +47,29 @@ COMPARISON_FIELDS = [
     "comparability_note",
 ]
 ACTUAL_SCENARIOS = (
+    {
+        "scenario_id": "ACTUAL-HTML-FIXTURE",
+        "scenario": "actual_html_fixture_pricing",
+        "mode": "html_fixture",
+        "architecture": "Local coursework HTML fixture",
+        "reference_scenario_id": "",
+        "comparability_note": (
+            "Saved local fixture parsing only; excludes retailer HTTP latency "
+            "and live product data, so it is not comparable to S.1 simulation."
+        ),
+    },
+    {
+        "scenario_id": "ACTUAL-KROGER-API",
+        "scenario": "actual_kroger_api_pricing",
+        "mode": "kroger",
+        "architecture": "Kroger Products API (S.1 source substitution)",
+        "reference_scenario_id": "S.1",
+        "comparability_note": (
+            "Official location-specific retailer API, not literal HTML "
+            "scraping; compare with S.1 only as the team-selected source "
+            "substitution, not as equivalent webpage latency."
+        ),
+    },
     {
         "scenario_id": "ACTUAL-LOCAL",
         "scenario": "actual_in_memory_dictionary",
@@ -69,7 +96,10 @@ ACTUAL_SCENARIOS = (
 
 
 def summarize_rows(rows: Iterable[dict[str, str]]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, str, str, str], list[float]] = {}
+    grouped: dict[
+        tuple[str, str, str, str, str],
+        list[tuple[str, float]],
+    ] = {}
     for row in rows:
         duration_value = row.get("duration_ns", "")
         if not duration_value:
@@ -77,20 +107,29 @@ def summarize_rows(rows: Iterable[dict[str, str]]) -> list[dict[str, object]]:
         key = (
             row.get("scenario", ""),
             row.get("mode", ""),
+            row.get("input_dataset_id", ""),
             row.get("stage", ""),
             row.get("status", ""),
         )
-        grouped.setdefault(key, []).append(int(duration_value) / 1_000_000_000)
+        grouped.setdefault(key, []).append(
+            (row.get("run_id", ""), int(duration_value) / 1_000_000_000)
+        )
 
     summaries: list[dict[str, object]] = []
-    for (scenario, mode, stage, status), values in sorted(grouped.items()):
+    for (scenario, mode, dataset_id, stage, status), samples in sorted(
+        grouped.items()
+    ):
+        values = [duration for _run_id, duration in samples]
+        run_ids = {run_id for run_id, _duration in samples if run_id}
         summaries.append(
             {
                 "scenario": scenario,
                 "mode": mode,
+                "input_dataset_id": dataset_id,
                 "stage": stage,
                 "status": status,
-                "run_count": len(values),
+                "run_count": len(run_ids) if run_ids else len(values),
+                "sample_count": len(values),
                 "minimum_duration_s": min(values),
                 "maximum_duration_s": max(values),
                 "mean_duration_s": statistics.mean(values),
@@ -112,16 +151,21 @@ def build_comparison_rows(
         for reference in reference_rows
     ]
     for actual in ACTUAL_SCENARIOS:
-        workflow_summary = next(
-            (
-                summary
-                for summary in summaries
-                if summary["scenario"] == actual["scenario"]
-                and summary["mode"] == actual["mode"]
-                and summary["stage"] == "pricing_workflow_total"
-                and summary["status"] == "success"
-            ),
-            None,
+        workflow_summaries = [
+            summary
+            for summary in summaries
+            if summary["scenario"] == actual["scenario"]
+            and summary["mode"] == actual["mode"]
+            and summary["stage"] == "pricing_workflow_total"
+            and summary["status"] == "success"
+        ]
+        if len(workflow_summaries) > 1:
+            raise ValueError(
+                "Comparison requires one input dataset per measured scenario; "
+                f"found multiple for {actual['scenario']}."
+            )
+        workflow_summary = (
+            workflow_summaries[0] if workflow_summaries else None
         )
         reference_mean = _reference_mean(
             reference_rows,
@@ -143,6 +187,11 @@ def build_comparison_rows(
                 "architecture": actual["architecture"],
                 "record_type": "measured_application",
                 "source": "Recipe Roulette benchmark CSV",
+                "input_dataset_id": (
+                    workflow_summary["input_dataset_id"]
+                    if workflow_summary is not None
+                    else ""
+                ),
                 "run_count": (
                     workflow_summary["run_count"]
                     if workflow_summary is not None
@@ -195,6 +244,7 @@ def _simulation_comparison_row(
         "architecture": reference.get("architecture", ""),
         "record_type": "innoslate_simulation",
         "source": reference.get("source", ""),
+        "input_dataset_id": "",
         "run_count": reference.get("runs", ""),
         "minimum_duration_s": reference.get("minimum_duration_s", ""),
         "maximum_duration_s": reference.get("maximum_duration_s", ""),
@@ -232,7 +282,7 @@ def _write_csv(
     fieldnames: list[str],
     rows: Iterable[dict[str, object]],
 ) -> None:
-    with path.open("w", newline="", encoding="utf-8") as file:
+    with path.open("x", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
@@ -251,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=ROOT_DIR / "results" / "chapter10-4" / "analysis",
+        default=ROOT_DIR / "results" / "chapter11" / "analysis",
     )
     args = parser.parse_args(argv)
 
@@ -263,13 +313,25 @@ def main(argv: list[str] | None = None) -> int:
     comparisons = build_comparison_rows(summaries, reference_rows)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(
+    output_paths = [
         args.output_dir / "stage-summary.csv",
+        args.output_dir / "scenario-comparison.csv",
+    ]
+    existing_outputs = [path for path in output_paths if path.exists()]
+    if existing_outputs:
+        print(
+            "Refusing to overwrite existing analysis output: "
+            + ", ".join(str(path) for path in existing_outputs),
+            file=sys.stderr,
+        )
+        return 2
+    _write_csv(
+        output_paths[0],
         SUMMARY_FIELDS,
         summaries,
     )
     _write_csv(
-        args.output_dir / "scenario-comparison.csv",
+        output_paths[1],
         COMPARISON_FIELDS,
         comparisons,
     )

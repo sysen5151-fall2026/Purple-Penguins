@@ -11,6 +11,7 @@ from openai import APIStatusError, OpenAI, OpenAIError
 
 from .openai_adapter import DEFAULT_MODEL, MAX_OUTPUT_TOKENS, _read_timeout
 from .errors import RecipeGenerationServiceError
+from pricing_timing import record_external_request
 
 
 _PRICING_SCHEMA = {
@@ -107,6 +108,7 @@ def request_price_estimates(
 ) -> object:
     """Send one structured pricing request without retrying."""
     try:
+        record_external_request()
         response = client.responses.create(
             model=model,
             input=request_input,
@@ -177,7 +179,10 @@ def validate_price_estimates(
         if isinstance(amount, bool) or not isinstance(amount, (int, float)):
             raise PricingBenchmarkError("invalid_estimated_price")
 
-        price = float(amount)
+        try:
+            price = float(amount)
+        except OverflowError as error:
+            raise PricingBenchmarkError("invalid_estimated_price") from error
         if not math.isfinite(price) or price < 0:
             raise PricingBenchmarkError("invalid_estimated_price")
 

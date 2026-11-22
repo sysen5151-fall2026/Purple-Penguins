@@ -16,7 +16,11 @@ _RECIPE_RESPONSE = json.dumps(
         "recipes": [
             {
                 "name": "Pasta Carbonara",
-                "ingredients": ["pasta", "eggs", "bacon"],
+                "ingredients": [
+                    {"name": "pasta", "quantity": 12, "unit": "oz"},
+                    {"name": "eggs", "quantity": 3, "unit": "count"},
+                    {"name": "bacon", "quantity": 4, "unit": "oz"},
+                ],
             }
         ]
     }
@@ -71,7 +75,11 @@ def test_openai_request_uses_structured_output_and_user_preferences(
     assert recipes == [
         {
             "name": "Pasta Carbonara",
-            "ingredients": ["pasta", "eggs", "bacon"],
+            "ingredients": [
+                {"name": "pasta", "quantity": 12.0, "unit": "oz"},
+                {"name": "eggs", "quantity": 3.0, "unit": "count"},
+                {"name": "bacon", "quantity": 4.0, "unit": "oz"},
+            ],
         }
     ]
     request = calls[0]
@@ -83,8 +91,112 @@ def test_openai_request_uses_structured_output_and_user_preferences(
     }
     assert request["text"]["format"]["type"] == "json_schema"
     assert request["text"]["format"]["strict"] is True
-    assert request["max_output_tokens"] == openai_adapter.MAX_OUTPUT_TOKENS
+    assert (
+        request["text"]["format"]["schema"]["properties"]["recipes"]["items"][
+            "properties"
+        ]["ingredients"]["items"]["required"]
+        == ["name", "quantity", "unit"]
+    )
+    assert request["max_output_tokens"] == openai_adapter.MAX_RECIPE_OUTPUT_TOKENS
     assert set(recipes[0]) == {"name", "ingredients"}
+
+
+def test_openai_generates_specific_brandless_ingredient_names(monkeypatch):
+    monkeypatch.setenv("RECIPE_GENERATION_MODE", "openai")
+    response = json.dumps(
+        {
+            "recipes": [
+                {
+                    "name": "Specific Ingredients",
+                    "ingredients": [
+                        {
+                            "name": "unsalted butter",
+                            "quantity": 2,
+                            "unit": "oz",
+                        },
+                        {
+                            "name": "dry angel hair pasta",
+                            "quantity": 8,
+                            "unit": "oz",
+                        },
+                        {
+                            "name": "canned diced tomatoes",
+                            "quantity": 14.5,
+                            "unit": "oz",
+                        },
+                        {
+                            "name": "whole milk",
+                            "quantity": 1,
+                            "unit": "cup",
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+    calls = _install_fake_openai(monkeypatch, [response])
+
+    recipes = llm_api_interface.send_recipe_requirements(
+        ["butter", "pasta", "tomatoes", "milk"],
+        25.0,
+        [],
+    )
+
+    ingredient_names = [
+        ingredient["name"]
+        for ingredient in recipes[0]["ingredients"]
+    ]
+    assert ingredient_names == [
+        "unsalted butter",
+        "dry angel hair pasta",
+        "canned diced tomatoes",
+        "whole milk",
+    ]
+    system_instructions = calls[0]["input"][0]["content"].casefold()
+    assert "do not add unnecessary specificity" in system_instructions
+    assert "do not invent or add brand names" in system_instructions
+    assert "unsalted butter" in system_instructions
+    assert "dry angel hair pasta" in system_instructions
+    assert "canned diced tomatoes" in system_instructions
+    assert "whole milk" in system_instructions
+    assert calls[0]["text"]["format"]["schema"]["properties"]["recipes"][
+        "items"
+    ]["properties"]["ingredients"]["items"]["required"] == [
+        "name",
+        "quantity",
+        "unit",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("quantity", "unit"),
+    [(0, "oz"), (-1, "lb"), (1, "piece"), (float("inf"), "g")],
+)
+def test_openai_response_rejects_invalid_recipe_quantity_or_unit(
+    quantity,
+    unit,
+):
+    output = json.dumps(
+        {
+            "recipes": [
+                {
+                    "name": "Example",
+                    "ingredients": [
+                        {
+                            "name": "rice",
+                            "quantity": quantity,
+                            "unit": unit,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    with pytest.raises(RecipeGenerationServiceError) as error:
+        openai_adapter._parse_response(output)
+
+    assert error.value.status_code == 502
 
 
 def test_openai_missing_credentials_raise_safe_service_error(monkeypatch):

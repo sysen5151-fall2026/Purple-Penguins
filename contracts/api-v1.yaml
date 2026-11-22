@@ -4,9 +4,11 @@ info:
   version: 1.0.0
   description: >-
     Recipe generation defaults to deterministic local recipes and can be
-    configured to use OpenAI. Grocery pricing remains deterministic in every
-    mode. Ingredient ownership affects estimated additional purchase cost;
-    this is not live grocery pricing or a production recommendation.
+    configured to use OpenAI. Grocery pricing defaults to local coursework
+    HTML fixtures, can explicitly use the location-specific Kroger Products
+    API, or can use deterministic in-memory demo pricing. Fixture prices are
+    illustrative only, not live retailer prices. Ingredient ownership affects
+    estimated additional purchase cost.
 paths:
   /api/v1/recipes:
     post:
@@ -50,7 +52,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/BackendFailure"
         "503":
-          description: Live recipe generation is not configured or is unavailable.
+          description: A configured recipe or grocery-pricing provider is unavailable or not configured.
           content:
             application/json:
               schema:
@@ -69,9 +71,12 @@ components:
         ingredients:
           type: array
           description: >-
-            Ingredients the user already owns. The backend uses case-insensitive
-            exact-name matching after trimming surrounding whitespace and assumes
-            the user has enough of each listed ingredient.
+            Ingredients the user already owns. Ownership preserves
+            case-insensitive exact-name matching after trimming surrounding
+            whitespace. It also recognizes only standard dry-pasta names and
+            shapes through a controlled compatibility rule; other
+            general-to-specific or different-form matches remain unconfirmed.
+            The backend assumes the user has enough of each matched ingredient.
           minItems: 1
           items:
             type: string
@@ -116,7 +121,7 @@ components:
           minLength: 1
         ingredients:
           type: array
-          description: Ingredient names and their estimated prices from the local pricing stub.
+          description: Ingredient names and estimated costs normalized to each generated recipe quantity.
           items:
             $ref: "#/components/schemas/PricedIngredient"
         estimated_total_cost:
@@ -149,7 +154,12 @@ components:
         estimated_price:
           type: number
           minimum: 0
-          description: Estimated price in USD from the deterministic grocery-store stub.
+          description: >-
+            Estimated USD cost for this ingredient's generated recipe quantity.
+            In html_fixture mode this is normalized from a matched fixture
+            package price; in kroger mode it is normalized from a matched
+            location-specific API package price; in stub mode it is a
+            historical deterministic demo value and is not quantity-normalized.
         owned:
           type: boolean
           description: Whether the ingredient exactly matches a user-owned ingredient after case and whitespace normalization.

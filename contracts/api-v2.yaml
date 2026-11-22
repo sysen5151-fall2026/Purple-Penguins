@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: Recipe Roulette API
+  version: 2.0.0
+  description: >-
+    Version 2 preserves the v1 ingredient-use cost fields and adds
+    package-purchase estimates. Each recipe is an alternative; package totals
+    are calculated independently per recipe and are not combined into a
+    shopping list. html_fixture package data is illustrative and not live;
+    kroger is an opt-in location-specific Products API source, not HTML scraping.
+paths:
+  /api/v2/recipes:
+    post:
+      operationId: generateRecipesV2
+      summary: Generate recipe recommendations with use and package costs
+      description: >-
+        Uses the same request schema as v1. The successful response retains
+        all v1 fields and adds package-purchase costs for unowned ingredients.
+        Ingredient-use costs and package-purchase costs are separate measures.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./api-v1.yaml#/components/schemas/RecipeGenerationRequest"
+      responses:
+        "200":
+          description: Recipe results with consumption and package-purchase estimates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeGenerationResponseV2"
+        "400":
+          description: The request body is malformed or contains invalid fields.
+          content:
+            application/json:
+              schema:
+                $ref: "./api-v1.yaml#/components/schemas/ValidationError"
+        "500":
+          description: Recipe generation or pricing failed unexpectedly.
+          content:
+            application/json:
+              schema:
+                $ref: "./api-v1.yaml#/components/schemas/BackendFailure"
+        "502":
+          description: The configured upstream provider returned unusable data.
+          content:
+            application/json:
+              schema:
+                $ref: "./api-v1.yaml#/components/schemas/BackendFailure"
+        "503":
+          description: A configured recipe or grocery-pricing provider is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "./api-v1.yaml#/components/schemas/BackendFailure"
+
+components:
+  schemas:
+    RecipeGenerationResponseV2:
+      type: object
+      additionalProperties: false
+      required:
+        - recipes
+      properties:
+        recipes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecipeResultV2"
+
+    RecipeResultV2:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - ingredients
+        - estimated_total_cost
+        - additional_purchase_cost
+        - within_budget
+        - package_purchase_status
+        - additional_package_purchase_cost
+        - within_package_budget
+      properties:
+        name:
+          type: string
+          minLength: 1
+        ingredients:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricedIngredientV2"
+        estimated_total_cost:
+          type: number
+          minimum: 0
+          description: Recipe ingredient-use cost for all ingredients, including owned items.
+        additional_purchase_cost:
+          type: number
+          minimum: 0
+          description: Recipe ingredient-use cost for ingredients not already owned; this is not full package checkout cost.
+        within_budget:
+          type: boolean
+          description: Whether additional_purchase_cost is less than or equal to budget.
+        package_purchase_status:
+          type: string
+          enum: ["available", "unavailable"]
+          description: Whether package-purchase estimates are complete for this recipe.
+        additional_package_purchase_cost:
+          anyOf:
+            - type: number
+              minimum: 0
+            - type: "null"
+          description: >-
+            Sum of whole package prices needed for unowned ingredients.
+            Null means one or more package estimates are unavailable.
+        within_package_budget:
+          anyOf:
+            - type: boolean
+            - type: "null"
+          description: >-
+            Whether additional_package_purchase_cost is within budget; null
+            when package-purchase information is unavailable.
+
+    PricedIngredientV2:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - estimated_price
+        - owned
+        - package_purchase
+      properties:
+        name:
+          type: string
+          minLength: 1
+        estimated_price:
+          type: number
+          minimum: 0
+          description: Ingredient-use cost normalized to the generated recipe quantity.
+        owned:
+          type: boolean
+        package_purchase:
+          $ref: "#/components/schemas/PackagePurchaseProvenance"
+
+    PackagePurchaseProvenance:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - source
+        - selected_product
+        - product_id
+        - package_price
+        - package_quantity
+        - package_unit
+        - currency
+        - packages_required
+        - purchase_cost
+      properties:
+        status:
+          type: string
+          enum: ["available", "not_required", "unavailable"]
+        source:
+          type: string
+          enum: ["html_fixture", "kroger", "stub"]
+          description: >-
+            html_fixture identifies local coursework HTML data; kroger
+            identifies the location-specific Products API; stub identifies
+            deterministic dictionary values.
+        selected_product:
+          anyOf:
+            - type: string
+            - type: "null"
+        product_id:
+          anyOf:
+            - type: string
+            - type: "null"
+        package_price:
+          anyOf:
+            - type: number
+              minimum: 0
+            - type: "null"
+        package_quantity:
+          anyOf:
+            - type: number
+              exclusiveMinimum: 0
+            - type: "null"
+        package_unit:
+          anyOf:
+            - type: string
+            - type: "null"
+        currency:
+          anyOf:
+            - type: string
+              const: USD
+            - type: "null"
+        packages_required:
+          anyOf:
+            - type: integer
+              minimum: 0
+            - type: "null"
+        purchase_cost:
+          anyOf:
+            - type: number
+              minimum: 0
+            - type: "null"

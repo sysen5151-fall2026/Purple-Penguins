@@ -8,6 +8,7 @@ import copy
 import os
 
 from grocery_store_interface import get_ingredient_pricing
+from grocery_store_interface.models import requirement_key
 from pricing_timing import measure_stage
 
 from .errors import RecipeGenerationServiceError
@@ -17,11 +18,20 @@ from .errors import RecipeGenerationServiceError
 _STUB_RECIPES = [
     {
         "name": "Pasta Carbonara",
-        "ingredients": ["pasta", "eggs", "bacon"],
+        "ingredients": [
+            {"name": "pasta", "quantity": 12.0, "unit": "oz"},
+            {"name": "eggs", "quantity": 3.0, "unit": "count"},
+            {"name": "bacon", "quantity": 4.0, "unit": "oz"},
+        ],
     },
     {
         "name": "Vegetable Stir-Fry",
-        "ingredients": ["broccoli", "bell peppers", "onions", "soy sauce"],
+        "ingredients": [
+            {"name": "broccoli", "quantity": 1.0, "unit": "head"},
+            {"name": "bell peppers", "quantity": 2.0, "unit": "count"},
+            {"name": "onions", "quantity": 1.0, "unit": "count"},
+            {"name": "soy sauce", "quantity": 2.0, "unit": "fl_oz"},
+        ],
     },
 ]
 
@@ -81,7 +91,7 @@ def send_recipe_requirements(ingredients, budget, dietary_restrictions):
 def request_pricing(recipes):
     """Call 13-16: App → LLM API: Request Pricing; LLM API → Grocery Store → LLM API → App.
     
-    Requests pricing for recipes, calls Grocery Store stub, and returns recipes with pricing.
+    Requests prices for recipe quantity requirements and returns normalized costs.
     
     Args:
         recipes: List of recipe dicts (without pricing)
@@ -103,27 +113,61 @@ def request_pricing(recipes):
     return recipes_with_pricing
 
 
+def request_pricing_with_quotes(recipes):
+    """Return price quotes with product/package provenance for API v2."""
+    print("[LLM API] Received pricing request for recipes.")
+    print()
+    recipes_with_quotes = get_pricing_with_quotes(recipes)
+    print("[LLM API] Processed ingredient pricing.")
+    print()
+    return recipes_with_quotes
+
+
 def get_pricing(recipes):
-    """Internal helper: calls Grocery Store stub and processes pricing for recipes.
+    """Request ingredient prices and process them for each recipe.
     
     Implements Calls 14-16 of the sequence (internal to request_pricing).
     
     Args:
-        recipes: List of recipe dicts with ingredients list
+        recipes:         List of recipe dicts with quantity-bearing ingredient requirements
     
     Returns:
         List of recipes with pricing data added.
     """
+    recipes_with_quotes = _get_pricing_with_quotes(recipes)
+    return [
+        {
+            "name": recipe["name"],
+            "ingredients": {
+                name: quote.ingredient_use_cost
+                for name, quote in recipe["quotes"].items()
+            },
+            "total_cost": recipe["total_cost"],
+        }
+        for recipe in recipes_with_quotes
+    ]
+
+
+def get_pricing_with_quotes(recipes):
+    """Return recipe cost data and the associated source/package quotes."""
+    return _get_pricing_with_quotes(recipes)
+
+
+def _get_pricing_with_quotes(recipes):
     # Call 14: LLM API → Grocery Store: Retrieve Prices
-    with measure_stage("pricing_request_processing"):
-        all_ingredients = set()
+    with measure_stage("pricing_request_preparation"):
+        all_ingredients = {}
         for recipe in recipes:
-            all_ingredients.update(recipe["ingredients"])
-        ingredient_names = list(all_ingredients)
+            for requirement in recipe["ingredients"]:
+                all_ingredients.setdefault(
+                    requirement_key(requirement),
+                    requirement,
+                )
+        ingredient_requirements = list(all_ingredients.values())
 
     print("[LLM API] Requesting pricing from Grocery Store...")
     # Call 15: Grocery Store → LLM API: Provide Pricing
-    pricing = get_ingredient_pricing(ingredient_names)
+    pricing = get_ingredient_pricing(ingredient_requirements)
     print("[LLM API] Received pricing data.")
     print()
 
@@ -132,15 +176,20 @@ def get_pricing(recipes):
         recipes_with_pricing = []
         for recipe in recipes:
             total_cost = 0.0
+            ingredient_quotes = {}
             recipe_with_pricing = {
                 "name": recipe["name"],
                 "ingredients": {},
             }
-            for ingredient in recipe["ingredients"]:
-                price = pricing.get(ingredient, 0.0)
+            for requirement in recipe["ingredients"]:
+                ingredient = requirement["name"]
+                quote = pricing[requirement_key(requirement)]
+                price = quote.ingredient_use_cost
+                ingredient_quotes[ingredient] = quote
                 recipe_with_pricing["ingredients"][ingredient] = price
                 total_cost += price
             recipe_with_pricing["total_cost"] = total_cost
+            recipe_with_pricing["quotes"] = ingredient_quotes
             recipes_with_pricing.append(recipe_with_pricing)
 
     return recipes_with_pricing

@@ -1,0 +1,7 @@
+scenario_id,architecture,record_type,source,input_dataset_id,run_count,minimum_duration_s,maximum_duration_s,mean_duration_s,median_duration_s,sample_standard_deviation_s,reference_scenario_id,reference_mean_duration_s,mean_delta_s,mean_delta_percent,comparability_note
+S.1,Webscraping,innoslate_simulation,Team-provided Innoslate simulation summary,,10,4.05,30.96,17.185,,,,,,,completed
+S.2,Database,innoslate_simulation,Team-provided Innoslate simulation summary,,10,2.67,17.94,6.86,,,,,,,completed
+S.3,LLM pricing,innoslate_simulation,Innoslate simulation,,,,,,,,,,,,pending
+ACTUAL-KROGER,Kroger Products API,measured_application,Recipe Roulette benchmark CSV,,,,,,,,S.1,17.185,,,"Official product API, not literal webpage scraping; compare with S.1 only as the team-approved source substitution."
+ACTUAL-LOCAL,In-memory dictionary,measured_application,Recipe Roulette benchmark CSV,chapter11-five-ingredient-requirements-v1,30,3.66e-05,0.0001039,4.357e-05,4.01e-05,1.2505230629758426e-05,S.2,6.86,-6.85995643,-99.99936486880466,Not a database query; compare with S.2 only as a limited local lookup proxy.
+ACTUAL-LLM,Experimental LLM price estimates,measured_application,Recipe Roulette benchmark CSV,,,,,,,,S.3,,,,Experimental unverified estimates; S.3 is not present in the current Innoslate export.
